@@ -1,0 +1,41 @@
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Admin Login</title>
+
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+
+  <style>
+    body{font-family:Arial;margin:30px;}
+    .box{max-width:420px;margin:auto;border:1px solid #ddd;border-radius:12px;padding:18px;}
+    input{width:100%;padding:10px;border-radius:10px;border:1px solid #bbb;margin-top:8px;}
+    button{width:100%;padding:10px;border-radius:10px;border:1px solid #bbb;margin-top:12px;cursor:pointer;}
+    .err{color:#b00020;margin-top:10px;}
+    .muted{color:#666;}
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h2>Admin Login</h2>
+    <p class="muted">Login with ID and password</p>
+
+    {% if message %}
+      <div class="err">{{ message }}</div>
+    {% endif %}
+
+    <form method="POST" action="/admin_login">
+      <label>ID</label>
+      <input name="admin_id" required>
+
+      <label style="display:block;margin-top:10px;">Password</label>
+      <input type="password" name="password" required>
+
+      <button type="submit">Login</button>
+    </form>
+  </div>
+</body>
+</html>

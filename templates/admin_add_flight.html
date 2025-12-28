@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Add Flight</title>
+  <style>
+    body{font-family:Arial;background:#f6f6f6;}
+    .box{max-width:650px;margin:30px auto;background:#fff;padding:18px;border-radius:12px;border:1px solid #ddd;}
+    input{padding:10px;border-radius:10px;border:1px solid #bbb;width:100%;box-sizing:border-box;}
+    button{padding:10px 14px;border-radius:10px;border:1px solid #bbb;cursor:pointer;}
+    .muted{color:#666;}
+    label{display:block;margin-top:12px;margin-bottom:6px;}
+  </style>
+</head>
+<body>
+
+<div class="box">
+  <h1 style="margin-top:0;">Add New Flight</h1>
+
+  {% if message %}
+    <p class="muted">{{ message }}</p>
+  {% endif %}
+
+  <form method="POST" action="/admin_add_flight">
+    <label>Flight Date (YYYY-MM-DD)*</label>
+    <input name="flight_date" placeholder="2025-12-28" required>
+
+    <label>Departure Time (HH:MM)*</label>
+    <input name="departure_time" placeholder="09:10" required>
+
+    <label>Landing Time (HH:MM) (optional)</label>
+    <input name="landing_time" placeholder="12:25">
+
+    <label>Plane ID*</label>
+    <input name="plane_id" placeholder="5006" required>
+
+    <label>Departure Airport (3 letters)*</label>
+    <input name="departure_airport" placeholder="TLV" required>
+
+    <label>Destination Airport (3 letters)*</label>
+    <input name="destination_airport" placeholder="ATH" required>
+
+    <p style="margin-top:14px;">
+      <button type="submit">Create Flight</button>
+      <a href="/admin_dashboard" style="margin-left:10px;">Back</a>
+    </p>
+  </form>
+</div>
+
+</body>
+</html>

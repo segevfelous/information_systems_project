@@ -2,8 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Booking Preview</title>
+  <title>order Preview</title>
   <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='styles.css') }}">
+
   <style>
     .box{max-width:900px;margin:20px auto;padding:14px;border:1px solid #ddd;border-radius:12px;}
     table{width:100%;border-collapse:collapse;margin-top:10px;}
@@ -17,9 +18,9 @@
 <body>
 
 <div class="box">
-  <h1>Booking Preview</h1>
+  <h1>order Preview</h1>
 
-  <p><b>Booking code:</b> {{ booking_code }}</p>
+  <p><b>order code:</b> {{ order_code }}</p>
   <p><b>Email:</b> {{ email }}</p>
 
   <p><b>Flight:</b> {{ flight_date }} {{ departure_time }} | {{ flight.Departure_Airport }} → {{ flight.Destination_Airport }}</p>
@@ -38,16 +39,16 @@
       <tr>
         <td>{{ s.seat }}</td>
         <td>{{ s.class }}</td>
-        <td>{{ s.price }}</td>
+        <td>{{ s.price }}$</td>
       </tr>
     {% endfor %}
     </tbody>
   </table>
 
   <h2>Total</h2>
-  <p><b>{{ total_price }}</b></p>
+  <p><b>{{ total_price }}$</b></p>
 
-  <form method="POST" action="/booking/confirm">
+  <form method="POST" action="/order/confirm">
     {% if need_unreg_details %}
       <h2>We don’t recognize this email — please enter details</h2>
       <div class="warning">All fields are required</div>
@@ -57,8 +58,8 @@
     {% endif %}
 
     <div class="actions">
-      <button type="submit">Confirm booking</button>
-      <a href="/flights">Cancel</a>
+      <button type="submit">Confirm order</button>
+      <a href="/session/clear">Cancel</a>
     </div>
   </form>
 </div>

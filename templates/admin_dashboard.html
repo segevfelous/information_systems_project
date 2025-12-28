@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Admin Dashboard</title>
+  <style>
+    body{font-family:Arial;background:#f6f6f6;}
+    .box{max-width:1100px;margin:30px auto;background:#fff;padding:18px;border-radius:12px;border:1px solid #ddd;}
+    table{width:100%;border-collapse:collapse;margin-top:12px;}
+    th,td{border:1px solid #eee;padding:8px;text-align:left;vertical-align:top;}
+    .muted{color:#666;}
+    button{padding:8px 12px;border-radius:10px;border:1px solid #bbb;cursor:pointer;}
+    a{color:#0077cc;text-decoration:none;}
+    .topbar{display:flex;justify-content:space-between;align-items:center;gap:12px;}
+  </style>
+</head>
+<body>
+
+<div class="box">
+  <div class="topbar">
+    <div>
+      <h1 style="margin:0;">Admin Dashboard</h1>
+      <div class="muted">Welcome, <b>{{ admin_name }}</b></div>
+    </div>
+    <div>
+      <a href="/admin_add_flight"><button type="button">+ Add New Flight</button></a>
+      <a href="/admin_logout" style="margin-left:10px;">Logout</a>
+    </div>
+  </div>
+
+  <h2 style="margin-top:18px;">All Flights</h2>
+
+  {% if flights|length == 0 %}
+    <p class="muted">No flights.</p>
+  {% else %}
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th><th>Departure</th><th>Landing</th>
+          <th>Route</th><th>Plane</th><th>Status</th><th>Hours Left</th><th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for f in flights %}
+        <tr>
+          <td>{{ f.Flight_Date }}</td>
+          <td>{{ f.Departure_Time }}</td>
+          <td>{{ f.Landing_Time }}</td>
+          <td>{{ f.Departure_Airport }} → {{ f.Destination_Airport }}</td>
+          <td>{{ f.Plane_ID }}</td>
+          <td>{{ f.status }}</td>
+          <td>{{ f.hours_left }}</td>
+          <td>
+            {% if f.can_cancel %}
+              <form method="POST" action="/admin_cancel_flight" style="margin:0;">
+                <input type="hidden" name="flight_date" value="{{ f.Flight_Date }}">
+                <input type="hidden" name="departure_time" value="{{ f.Departure_Time }}">
+                <button type="submit">Cancel Flight</button>
+              </form>
+            {% else %}
+              <span class="muted">—</span>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+
+    <p class="muted" style="margin-top:10px;">
+      * Cancel is enabled only for future flights with more than 72 hours left.
+      Cancelling sets flight status to <b>cancelled</b> and bookings to <b>admin cancelled</b> with full refund.
+    </p>
+  {% endif %}
+</div>
+
+</body>
+</html>

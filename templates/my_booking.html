@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>My Bookings</title>
+  <style>
+    .box{max-width:1000px;margin:20px auto;padding:14px;border:1px solid #ddd;border-radius:12px;}
+    table{width:100%;border-collapse:collapse;margin-top:10px;}
+    th,td{border:1px solid #eee;padding:8px;text-align:left;vertical-align:top;}
+    .muted{color:#666;}
+    .section{margin-top:18px;}
+    input{padding:10px;border-radius:10px;border:1px solid #bbb;width:100%;max-width:360px;}
+    button{padding:10px 14px;border-radius:10px;border:1px solid #bbb;cursor:pointer;}
+  </style>
+</head>
+<body>
+
+<div class="box">
+  <h1>My Bookings</h1>
+
+  {% if not email %}
+    <form method="GET" action="/my_booking">
+      <p class="muted">Enter your email to view your bookings:</p>
+      <p><input name="email" placeholder="Email" required></p>
+      <button type="submit">Show bookings</button>
+    </form>
+  {% else %}
+    <p class="muted">Showing bookings for: <b>{{ email }}</b></p>
+
+    <div class="section">
+      <h2>Upcoming flights</h2>
+      {% if upcoming|length == 0 %}
+        <p class="muted">No upcoming flights.</p>
+      {% else %}
+        <table>
+          <thead>
+            <tr>
+              <th>Booking</th><th>Route</th><th>Date & Time</th><th>Seats</th><th>Status</th><th>Total Paid Price</th><th> </th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for b in upcoming %}
+            <tr>
+              <td>#{{ b.booking_code }}</td>
+              <td>{{ b.Departure_Airport }} → {{ b.Destination_Airport }}</td>
+              <td>{{ b.Flight_Date }} {{ b.Departure_Time }}</td>
+              <td>{{ b.seats }}</td>
+              <td>{{ b.status }}</td>
+              <td>{{ b.total_price }}</td>
+              <td>
+  {% if b.status|lower not in ['customer cancelled', 'customer cancelled', 'cancelled'] %}
+    <form method="POST" action="/booking/cancel" style="margin:0;">
+      <input type="hidden" name="booking_code" value="{{ b.booking_code }}">
+      <input type="hidden" name="email" value="{{ email }}">
+      <button type="submit">Cancel</button>
+    </form>
+  {% else %}
+    <span class="muted">—</span>
+  {% endif %}
+</td>
+
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% endif %}
+    </div>
+
+    <div class="section">
+      <h2>History</h2>
+      {% if history|length == 0 %}
+        <p class="muted">No history yet.</p>
+      {% else %}
+        <table>
+          <thead>
+            <tr>
+              <th>Booking</th><th>Route</th><th>Date & Time</th><th>Seats</th><th>Status</th><th>Total Paid Price</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for b in history %}
+            <tr>
+              <td>#{{ b.booking_code }}</td>
+              <td>{{ b.Departure_Airport }} → {{ b.Destination_Airport }}</td>
+              <td>{{ b.Flight_Date }} {{ b.Departure_Time }}</td>
+              <td>{{ b.seats }}</td>
+              <td>{{ b.status }}</td>
+              <td>{{ b.total_price }}$</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% endif %}
+    </div>
+  {% endif %}
+
+  <p class="muted" style="margin-top:16px;">
+    <a href="/session/clear">Back</a></p>
+</div>
+
+</body>
+</html>

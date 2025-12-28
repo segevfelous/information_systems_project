@@ -45,7 +45,7 @@
     {% endif %}
   </div>
 
-  <form method="POST" action="/booking/preview">
+  <form method="POST" action="/order/preview">
     <input type="hidden" name="flight_date" value="{{ flight_date }}">
     <input type="hidden" name="departure_time" value="{{ departure_time }}">
     <input type="hidden" id="selected_seats" name="selected_seats" value="">
@@ -100,7 +100,7 @@
     {% endfor %}
 
     <div class="actions">
-      <button type="submit">Continue → Create Booking</button>
+      <button type="submit">Continue → Create order</button>
       <a href="/flights">Back to flights</a>
     </div>
   </form>
