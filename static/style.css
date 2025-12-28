@@ -1,98 +1,146 @@
+/* =========================
+   FLYTAU Sky / Turquoise Theme
+   ========================= */
+
 :root{
-  --bg:#f6f8fb;
-  --card:#ffffff;
-  --text:#0b1b3a;
-  --muted:#5b6b86;
-  --line:#e6ebf2;
-  --blue:#0a3d91;
-  --blue2:#1a5bd6;
-  --danger:#c62828;
-  --ok:#1b8f4b;
-  --shadow:0 10px 25px rgba(12, 29, 59, .08);
-  --radius:14px;
-  --font: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+  --bg1:#eaf7ff;         /* sky */
+  --bg2:#f7fbff;         /* near-white */
+  --brand:#00b7c7;       /* turquoise */
+  --brand2:#1f7aff;      /* sky blue */
+  --text:#0b1b2b;        /* deep navy */
+  --muted:#5b6b7a;
+  --card:#ffffffcc;      /* glass */
+  --border:#d7e7f3;
+  --shadow: 0 18px 55px rgba(8, 24, 48, .12);
+  --radius:18px;
 }
 
 *{box-sizing:border-box}
+html,body{height:100%}
 body{
   margin:0;
-  font-family:var(--font);
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
   color:var(--text);
-  background:linear-gradient(180deg,#eef4ff 0%, var(--bg) 40%, var(--bg) 100%);
+
+  /* שמיים + גלים עדינים */
+  background:
+    radial-gradient(1200px 600px at 20% 10%, rgba(31,122,255,.25) 0%, transparent 60%),
+    radial-gradient(1000px 700px at 80% 20%, rgba(0,183,199,.22) 0%, transparent 55%),
+    linear-gradient(180deg, var(--bg1) 0%, var(--bg2) 55%, #ffffff 100%);
 }
 
-a{color:var(--blue2); text-decoration:none}
-a:hover{text-decoration:underline}
-
+/* Container כללי */
 .container{
   max-width:1100px;
-  margin:0 auto;
-  padding:20px;
+  margin: 0 auto;
+  padding: 28px 18px 60px;
 }
 
+/* כרטיס (glass) */
 .card{
-  background:var(--card);
-  border:1px solid var(--line);
-  border-radius:var(--radius);
-  box-shadow:var(--shadow);
+  width:min(560px, 92vw);
+  margin: 58px auto;
+  background: var(--card);
+  backdrop-filter: blur(10px);
+  border:1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 22px;
 }
 
-.hstack{display:flex; align-items:center; gap:12px}
-.vstack{display:flex; flex-direction:column; gap:12px}
+/* כותרות */
+h1,h2,h3{
+  margin:0 0 10px;
+  letter-spacing: .2px;
+}
+h2{font-size:30px}
+p{margin:0 0 12px; color:var(--muted)}
 
-.badge{
+/* Labels + Inputs */
+label{
+  display:block;
+  margin: 14px 0 6px;
+  font-weight:650;
+  color: #13324f;
+}
+
+input, select{
+  width:100%;
+  padding: 12px 12px;
+  border-radius: 14px;
+  border:1px solid var(--border);
+  outline:none;
+  background:#fff;
+  font-size: 15px;
+  transition: .15s ease;
+}
+
+input:focus, select:focus{
+  border-color: rgba(0,183,199,.85);
+  box-shadow: 0 0 0 4px rgba(0,183,199,.18);
+}
+
+/* Buttons */
+button, .btn{
   display:inline-flex;
   align-items:center;
-  gap:8px;
-  padding:6px 10px;
-  border-radius:999px;
-  font-size:13px;
-  border:1px solid var(--line);
-  background:#f7f9ff;
-  color:var(--muted);
-}
-
-.badge.dot::before{
-  content:"";
-  width:8px;height:8px;border-radius:50%;
-  background:var(--muted);
-  display:inline-block;
-}
-
-.btn{
-  border:1px solid var(--line);
-  background:#fff;
-  padding:10px 14px;
-  border-radius:12px;
+  justify-content:center;
+  gap:10px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 0;
   cursor:pointer;
-  font-weight:600;
-  color:var(--text);
-}
-.btn:hover{border-color:#cfd9ea}
-
-.btn.primary{
-  background:linear-gradient(90deg,var(--blue) 0%, var(--blue2) 100%);
-  color:#fff;
-  border-color:transparent;
-}
-.btn.primary:hover{filter:brightness(1.03)}
-
-.btn.danger{
-  background:#fff;
-  color:var(--danger);
-  border-color:#f0c9c9;
-}
-.btn.danger:hover{background:#fff5f5}
-
-.input{
+  font-weight:700;
+  font-size: 15px;
+  color:white;
   width:100%;
-  padding:12px 12px;
-  border-radius:12px;
-  border:1px solid var(--line);
-  outline:none;
+  background: linear-gradient(90deg, var(--brand) 0%, var(--brand2) 60%, #3aa2ff 100%);
+  box-shadow: 0 10px 24px rgba(31,122,255,.18);
+  transition: transform .08s ease, filter .15s ease;
+}
+
+button:hover, .btn:hover{filter:brightness(1.03)}
+button:active, .btn:active{transform: translateY(1px)}
+
+/* Error / messages */
+.err{
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255, 64, 84, .10);
+  border: 1px solid rgba(255, 64, 84, .18);
+  color: #b00020;
+  font-weight: 600;
+}
+
+/* Small helper text */
+.muted{color:var(--muted)}
+
+/* טבלאות (במקרה של dashboard וכו׳) */
+table{
+  width:100%;
+  border-collapse: collapse;
+  background:#fff;
+  border:1px solid var(--border);
+  border-radius: 14px;
+  overflow:hidden;
+  box-shadow: 0 10px 22px rgba(8,24,48,.06);
+}
+th, td{
+  padding: 10px 12px;
+  border-bottom:1px solid #edf4fb;
+  text-align:left;
   font-size:14px;
 }
-.input:focus{border-color:#b8c8e8; box-shadow:0 0 0 4px rgba(26,91,214,.10)}
+th{
+  background: linear-gradient(90deg, rgba(0,183,199,.12), rgba(31,122,255,.10));
+  color:#12314e;
+  font-weight:800;
+}
+tr:hover td{background:#f6fbff}
 
-.muted{color:var(--muted)}
-.hr{height:1px;background:var(--line); border:0; margin:0}
+/* Page top accent bar */
+.topbar{
+  height: 6px;
+  background: linear-gradient(90deg, var(--brand) 0%, var(--brand2) 55%, #7cdcff 100%);
+}
