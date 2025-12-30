@@ -5,6 +5,13 @@ from datetime import timedelta, datetime, date, time
 import string
 import re
 import random
+from utilities import (
+    validate_long_flight_plane_size,
+    fetch_flight,
+    can_assign_staff,
+    can_use_plane,
+    lock_total_price_at_booking_time,
+)
 
 
 
@@ -874,7 +881,6 @@ def admin_dashboard():
         flights=flights_view
     )
 
-
 @app.route("/admin_add_flight", methods=["GET", "POST"])
 def admin_add_flight():
     if not session.get("admin_id"):
@@ -883,59 +889,136 @@ def admin_add_flight():
     if request.method == "GET":
         return render_template("admin_add_flight.html", message="")
 
-    flight_date = (request.form.get("flight_date") or "").strip()        # YYYY-MM-DD
-    departure_time = (request.form.get("departure_time") or "").strip()  # HH:MM
-    landing_time = (request.form.get("landing_time") or "").strip()      # HH:MM (optional)
+    # ---------- קלט ----------
+    flight_date = (request.form.get("flight_date") or "").strip()
+    departure_time = (request.form.get("departure_time") or "").strip()
+    landing_time = (request.form.get("landing_time") or "").strip() or None
     plane_id = (request.form.get("plane_id") or "").strip()
     dep_airport = (request.form.get("departure_airport") or "").strip().upper()
     dest_airport = (request.form.get("destination_airport") or "").strip().upper()
 
+    # ---------- ולידציה בסיסית ----------
     if not (flight_date and departure_time and plane_id and dep_airport and dest_airport):
         return render_template("admin_add_flight.html", message="Missing required fields")
 
     if not plane_id.isdigit():
-        return render_template("admin_add_flight.html", message="Plane ID must be a number")
+        return render_template("admin_add_flight.html", message="Plane ID must be numeric")
 
-    # normalize time seconds
+    # נרמול שעה
     if len(departure_time) == 5:
         departure_time += ":00"
     if landing_time and len(landing_time) == 5:
         landing_time += ":00"
 
+    # ---------- הלוגיקה האמיתית ----------
+    ok, msg = add_flight_with_rules(
+        mydb,
+        flight_date,
+        departure_time,
+        int(plane_id),
+        landing_time,
+        dep_airport,
+        dest_airport,
+        status="active"
+    )
+
+    if not ok:
+        return render_template("admin_add_flight.html", message=msg)
+
+    return redirect("/admin_dashboard")
+
+
+def add_flight_with_rules(mydb, flight_date, departure_time, plane_id, landing_time, dep_airport, dest_airport, status="active"):
     cur = mydb.cursor(dictionary=True)
     try:
-        # plane exists?
-        cur.execute("SELECT 1 FROM plane WHERE id=%s LIMIT 1", (int(plane_id),))
-        if not cur.fetchone():
-            cur.close()
-            return render_template("admin_add_flight.html", message="Plane ID not found")
+        # build a flight_row-like dict for validation
+        flight_row = {
+            "flight_date": flight_date,
+            "departure_time": departure_time,
+            "plane_id": int(plane_id),
+            "landing_time": landing_time,
+            "dep_airport": dep_airport,
+            "dest_airport": dest_airport,
+            "status": status
+        }
 
-        # unique (Flight_Date, Departure_Time)
-        cur.execute("""
-            SELECT 1 FROM flights
-            WHERE Flight_Date=%s AND Departure_Time=%s
-            LIMIT 1
-        """, (flight_date, departure_time))
-        if cur.fetchone():
-            cur.close()
-            return render_template("admin_add_flight.html", message="A flight already exists at that date & time")
+        # enforce long-flight rule vs plane size
+        validate_long_flight_plane_size(cur, flight_row)
+
+        # ----------- התוספת שדיברנו עליה עכשיו -----------
+        ok, msg = can_use_plane(cur, flight_row, int(plane_id))
+        if not ok:
+            return False, msg
+        # ---------------------------------------------------
 
         cur.execute("""
-            INSERT INTO flights
-            (Flight_Date, Departure_Time, Plane_ID, Landing_Time, Departure_Airport, Destination_Airport, status)
+            INSERT INTO `Flights`
+            (`flight_date`, `departure_time`, `Plane_ID`, `Landing_Time`,
+             `Departure_Airport`, `Destination_Airport`, `status`)
             VALUES (%s,%s,%s,%s,%s,%s,%s)
         """, (flight_date, departure_time, int(plane_id),
               landing_time if landing_time else None,
-              dep_airport, dest_airport, "active"))
-        mydb.commit()
-        cur.close()
-        return redirect("/admin_dashboard")
+              dep_airport, dest_airport, status))
 
+        mydb.commit()
+        return True, ""
     except Exception as e:
         mydb.rollback()
+        return False, str(e)
+    finally:
         cur.close()
-        return render_template("admin_add_flight.html", message=f"Failed: {e}")
 
+
+def assign_staff_to_flight_with_rules(mydb, flight_date, departure_time, plane_id, staff_id):
+    cur = mydb.cursor(dictionary=True)
+    try:
+        flight_row = fetch_flight(cur, flight_date, departure_time, plane_id)
+        if not flight_row:
+            return False, "Flight not found"
+
+        ok, msg = can_assign_staff(cur, flight_row, int(staff_id))
+        if not ok:
+            return False, msg
+
+        # prevent duplicate assignment (optional but recommended)
+        cur.execute("""
+            SELECT 1 FROM `Staff_On_Flight`
+            WHERE `flight_date`=%s AND `departure_time`=%s AND `plane_ID`=%s AND `ID`=%s
+            LIMIT 1
+        """, (flight_date, departure_time, int(plane_id), int(staff_id)))
+        if cur.fetchone():
+            return False, "Staff already assigned to this flight"
+
+        cur.execute("""
+            INSERT INTO `Staff_On_Flight` (`flight_date`, `departure_time`, `plane_ID`, `ID`)
+            VALUES (%s,%s,%s,%s)
+        """, (flight_date, departure_time, int(plane_id), int(staff_id)))
+
+        mydb.commit()
+        return True, ""
+    except Exception as e:
+        mydb.rollback()
+        return False, str(e)
+    finally:
+        cur.close()
+def lock_booking_price_after_tickets(mydb, booking_code, flight_date, departure_time, plane_id, base_per_hour=120.0):
+    cur = mydb.cursor(dictionary=True)
+    try:
+        total = lock_total_price_at_booking_time(
+            cur,
+            int(booking_code),
+            flight_date,
+            departure_time,
+            int(plane_id),
+            base_per_hour=float(base_per_hour)
+        )
+        mydb.commit()
+        return True, total
+    except Exception as e:
+        mydb.rollback()
+        return False, str(e)
+    finally:
+        cur.close()
 
 @app.route("/admin_cancel_flight", methods=["POST"])
 def admin_cancel_flight():
