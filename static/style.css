@@ -1,146 +1,226 @@
-/* =========================
-   FLYTAU Sky / Turquoise Theme
-   ========================= */
-
-:root{
-  --bg1:#eaf7ff;         /* sky */
-  --bg2:#f7fbff;         /* near-white */
-  --brand:#00b7c7;       /* turquoise */
-  --brand2:#1f7aff;      /* sky blue */
-  --text:#0b1b2b;        /* deep navy */
-  --muted:#5b6b7a;
-  --card:#ffffffcc;      /* glass */
-  --border:#d7e7f3;
-  --shadow: 0 18px 55px rgba(8, 24, 48, .12);
-  --radius:18px;
+/* ===== RESET בסיסי ===== */
+* {
+  box-sizing: border-box;
 }
 
-*{box-sizing:border-box}
-html,body{height:100%}
-body{
-  margin:0;
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-  color:var(--text);
-
-  /* שמיים + גלים עדינים */
-  background:
-    radial-gradient(1200px 600px at 20% 10%, rgba(31,122,255,.25) 0%, transparent 60%),
-    radial-gradient(1000px 700px at 80% 20%, rgba(0,183,199,.22) 0%, transparent 55%),
-    linear-gradient(180deg, var(--bg1) 0%, var(--bg2) 55%, #ffffff 100%);
+body {
+  margin: 0;
+  font-family: Arial, Helvetica, sans-serif;
+  background: #F6F8FC;
+  color: #0E1D2D;
 }
 
-/* Container כללי */
-.container{
-  max-width:1100px;
-  margin: 0 auto;
-  padding: 28px 18px 60px;
+/* ===== עיצוב כללי לכל עמוד ===== */
+body > div {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-/* כרטיס (glass) */
-.card{
-  width:min(560px, 92vw);
-  margin: 58px auto;
-  background: var(--card);
-  backdrop-filter: blur(10px);
-  border:1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  padding: 22px;
+/* ===== קונטיינר מרכזי (גם אם אין class) ===== */
+body > div > div {
+  background: white;
+  padding: 32px;
+  width: 100%;
+  max-width: 420px;
+  border-radius: 20px;
+  box-shadow: 0 14px 36px rgba(14,29,45,0.12);
 }
 
-/* כותרות */
-h1,h2,h3{
-  margin:0 0 10px;
-  letter-spacing: .2px;
-}
-h2{font-size:30px}
-p{margin:0 0 12px; color:var(--muted)}
-
-/* Labels + Inputs */
-label{
-  display:block;
-  margin: 14px 0 6px;
-  font-weight:650;
-  color: #13324f;
+/* ===== כותרות ===== */
+h1 {
+  text-align: center;
+  margin-top: 0;
+  color: #0E1D2D;
 }
 
-input, select{
-  width:100%;
-  padding: 12px 12px;
+h3 {
+  margin-bottom: 8px;
+}
+
+/* ===== הודעות שגיאה ===== */
+.warning {
+  text-align: center;
+  color: #6F5BFF; /* סגול בהיר */
+  font-weight: bold;
+}
+
+/* ===== טפסים ===== */
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* ===== שדות קלט – עובד גם בלי class ===== */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="date"] {
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid #E6EBF3;
+  font-size: 14px;
+  width: 100%;
+}
+
+input:focus {
+  outline: none;
+  border-color: #6F5BFF;
+  box-shadow: 0 0 0 3px rgba(201,182,255,0.5);
+}
+
+/* ===== כפתורים ===== */
+input[type="submit"],
+button {
+  padding: 12px;
   border-radius: 14px;
-  border:1px solid var(--border);
-  outline:none;
-  background:#fff;
+  border: none;
   font-size: 15px;
-  transition: .15s ease;
+  font-weight: bold;
+  cursor: pointer;
+  background: #4A7A87; /* כחול-טורקיז של הלוגו */
+  color: white;
 }
 
-input:focus, select:focus{
-  border-color: rgba(0,183,199,.85);
-  box-shadow: 0 0 0 4px rgba(0,183,199,.18);
+input[type="submit"]:hover,
+button:hover {
+  background: #2E4D5C;
 }
 
-/* Buttons */
-button, .btn{
-  display:inline-flex;
+/* ===== כפתור משני (Add phone וכו') ===== */
+button {
+  background: #C9B6FF; /* סגול בהיר */
+  color: #0E1D2D;
+}
+
+button:hover {
+  background: #BFA7FF;
+}
+
+/* ===== קישורים ===== */
+a {
+  display: block;
+  text-align: center;
+  margin-top: 14px;
+  color: #4A7A87;
+  text-decoration: none;
+  font-weight: bold;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+
+/* ===== HOME (El-Al inspired) ===== */
+
+.page-wrap{
+  min-height: 100vh;
+  display:flex;
   align-items:center;
   justify-content:center;
-  gap:10px;
+  padding: 28px;
+  background:
+    radial-gradient(900px 420px at 20% 10%,
+      rgba(74,122,135,.22) 0%,
+      rgba(201,182,255,.22) 35%,
+      rgba(246,248,252,1) 70%);
+}
+
+.home-card{
+  width: 100%;
+  max-width: 520px;
+  background: white;
+  border: 1px solid #E6EBF3;
+  border-radius: 22px;
+  padding: 28px;
+  box-shadow: 0 14px 36px rgba(14,29,45,0.12);
+  text-align: center;
+}
+
+.logo{
+  display:block;
+  margin: 0 auto 14px;
+  max-width: 150px;
+  height:auto;
+}
+
+.title{
+  margin: 0 0 6px;
+  font-size: 30px;
+  font-weight: 900;
+  color: #0E1D2D;
+}
+
+.subtitle{
+  margin: 0 0 18px;
+  color: #546275;
+  font-weight: 700;
+}
+
+.btn-group{
+  display:flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.btn{
+  display:flex;
+  align-items:center;
+  justify-content:center;
   padding: 12px 14px;
-  border-radius: 14px;
-  border: 0;
-  cursor:pointer;
-  font-weight:700;
-  font-size: 15px;
-  color:white;
-  width:100%;
-  background: linear-gradient(90deg, var(--brand) 0%, var(--brand2) 60%, #3aa2ff 100%);
-  box-shadow: 0 10px 24px rgba(31,122,255,.18);
-  transition: transform .08s ease, filter .15s ease;
+  border-radius: 16px;
+  font-weight: 900;
+  text-decoration:none;
+  border: 1px solid transparent;
+  transition: transform .06s ease, background .2s ease, border-color .2s ease;
 }
 
-button:hover, .btn:hover{filter:brightness(1.03)}
-button:active, .btn:active{transform: translateY(1px)}
+.btn:active{ transform: translateY(1px); }
 
-/* Error / messages */
-.err{
-  margin-top: 10px;
-  padding: 10px 12px;
-  border-radius: 14px;
-  background: rgba(255, 64, 84, .10);
-  border: 1px solid rgba(255, 64, 84, .18);
-  color: #b00020;
-  font-weight: 600;
+/* Primary (logo blue/teal) */
+.btn.primary{
+  background: #4A7A87;
+  color: white;
+  box-shadow: 0 14px 26px rgba(74,122,135,.25);
+}
+.btn.primary:hover{ background: #2E4D5C; }
+
+/* Accent (light purple) */
+.btn.accent{
+  background: rgba(201,182,255,.38);
+  color: #0E1D2D;
+  border-color: rgba(201,182,255,.70);
+}
+.btn.accent:hover{
+  background: rgba(191,167,255,.50);
 }
 
-/* Small helper text */
-.muted{color:var(--muted)}
+/* Ghost (neutral but still on-brand) */
+.btn.ghost{
+  background: white;
+  color: #0E1D2D;
+  border-color: #E6EBF3;
+}
+.btn.ghost:hover{
+  background: rgba(201,182,255,.16);
+  border-color: rgba(201,182,255,.45);
+}
 
-/* טבלאות (במקרה של dashboard וכו׳) */
-table{
-  width:100%;
-  border-collapse: collapse;
-  background:#fff;
-  border:1px solid var(--border);
-  border-radius: 14px;
-  overflow:hidden;
-  box-shadow: 0 10px 22px rgba(8,24,48,.06);
+/* Logout */
+.btn.danger{
+  background: #0E1D2D;
+  color: white;
 }
-th, td{
-  padding: 10px 12px;
-  border-bottom:1px solid #edf4fb;
-  text-align:left;
-  font-size:14px;
+.btn.danger:hover{
+  background: #081321;
 }
-th{
-  background: linear-gradient(90deg, rgba(0,183,199,.12), rgba(31,122,255,.10));
-  color:#12314e;
-  font-weight:800;
-}
-tr:hover td{background:#f6fbff}
 
-/* Page top accent bar */
-.topbar{
-  height: 6px;
-  background: linear-gradient(90deg, var(--brand) 0%, var(--brand2) 55%, #7cdcff 100%);
+.divider{
+  height: 1px;
+  background: #E6EBF3;
+  margin: 18px 0;
 }

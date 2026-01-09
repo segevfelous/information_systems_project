@@ -16,6 +16,7 @@ from utilities import (
 
 
 
+
 app = Flask(__name__)
 
 app.config.update(
@@ -64,6 +65,8 @@ def login():
         db_password = row[0]
 
         if db_password == pw:
+            session.clear()
+            session["role"] = "user"
             session["username"] = email
             return redirect("/")
         else:
@@ -74,7 +77,7 @@ def login():
 
 @app.route("/logout")
 def logout():
-    session.pop("username", None)
+    session.clear()      # מוחק את כל הסשן (user / admin / role)
     return redirect("/login")
 
 
@@ -89,6 +92,19 @@ def signup():
         password = request.form.get("password")
         now = datetime.now()
 
+        phones = request.form.getlist("phone")
+
+        clean_phones = []
+        seen = set()
+        for p in phones:
+            p = (p or "").strip()
+            if not p:
+                continue
+            if p in seen:
+                continue
+            seen.add(p)
+            clean_phones.append(p)
+
         cur = mydb.cursor()
 
         cur.execute("SELECT 1 FROM `registered_customers` WHERE `email` = %s", (email,))
@@ -100,8 +116,16 @@ def signup():
 
         cur.execute(
             "INSERT INTO `registered_customers` (`email`,`fname`, `lname`, `date_of_birth`, `passport`, `password`, `registration_date`) VALUES (%s,%s,%s,%s,%s,%s,%s)",
-            (email,first_name, last_name, date_of_birth, passport_number, password, now)
+            (email, first_name, last_name, date_of_birth, passport_number, password, now)
         )
+
+        sql_phone = """
+            INSERT INTO `phone_numbers` (`email`, `phone_number`)
+            VALUES (%s, %s)
+        """
+        for phone in clean_phones:
+            cur.execute(sql_phone, (email, phone))
+
         cur.close()
 
         session["username"] = email
@@ -616,6 +640,7 @@ def order_success():
 
 @app.route("/my_booking", methods=["GET"])
 def my_bookings():
+
     email = session.get("username") or session.get("guest_email") or (request.args.get("email") or "").strip()
 
     if not email:
@@ -791,48 +816,52 @@ def booking_cancel():
 
 @app.route("/admin_login", methods=["GET", "POST"])
 def admin_login():
-    if request.method == "POST":
-        admin_id = (request.form.get("admin_id") or "").strip()
-        pw = (request.form.get("password") or "").strip()
+    if request.method == "GET":
+        if (session.get("admin_id") or session.get("admin_name")) and session.get("role") != "admin":
+            session.clear()
+        if session.get("role") == "admin" and not session.get("admin_id"):
+            session.clear()
+        return render_template("admin_login.html", message="")   # ✅ חייב להיות פה
 
-        if not admin_id.isdigit():
-            return render_template("admin_login.html", message="ID must be a number")
+    # POST
+    admin_id = (request.form.get("admin_id") or "").strip()
+    pw = (request.form.get("password") or "").strip()
 
-        cur = mydb.cursor(dictionary=True)
-        cur.execute("""
-            SELECT ID, fname, lname, password
-            FROM admin
-            WHERE ID = %s
-            LIMIT 1
-        """, (int(admin_id),))
-        row = cur.fetchone()
-        cur.close()
+    if not admin_id.isdigit():
+        return render_template("admin_login.html", message="ID must be a number")
 
-        if not row:
-            return render_template("admin_login.html", message="Admin not found")
+    cur = mydb.cursor(dictionary=True)
+    cur.execute("""
+        SELECT ID, fname, lname, password
+        FROM admin
+        WHERE ID = %s
+        LIMIT 1
+    """, (int(admin_id),))
+    row = cur.fetchone()
+    cur.close()
 
-        if (row.get("password") or "") != pw:
-            return render_template("admin_login.html", message="Wrong password")
+    if not row:
+        return render_template("admin_login.html", message="Admin not found")
 
-        # סשן מנהל
-        session["admin_id"] = row["ID"]
-        session["admin_name"] = f'{row["fname"]} {row["lname"]}'
-        return redirect("/admin_dashboard")
+    if (row.get("password") or "") != pw:
+        return render_template("admin_login.html", message="Wrong password")
 
-    return render_template("admin_login.html", message="")
+    session.clear()
+    session["role"] = "admin"
+    session["admin_id"] = row["ID"]
+    session["admin_name"] = f'{row["fname"]} {row["lname"]}'
 
+    return redirect("/admin_dashboard")  # ✅ רק אחרי הצלחה
 
 @app.route("/admin_logout")
 def admin_logout():
-    session.pop("admin_id", None)
-    session.pop("admin_name", None)
-    return redirect("/")
+    session.clear()
+    return redirect("/admin_login")
 
-from datetime import datetime, timedelta
 
 @app.route("/admin_dashboard")
 def admin_dashboard():
-    if not session.get("admin_id"):
+    if session.get("role") != "admin":   # ✅ החלפה כאן
         return redirect("/admin_login")
 
     cur = mydb.cursor(dictionary=True)

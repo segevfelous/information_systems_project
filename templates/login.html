@@ -2,13 +2,13 @@
 <html lang="en">
 
    <head>
-      <title>Session Exercise</title>
+      <title>Login</title>
       <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-
    </head>
 
    <body>
       <div>
+          <div>
           <h1> Login </h1>
           <h4 class="warning">{{message}}</h4>
           <form action="/login" method="POST">
@@ -18,9 +18,9 @@
              <br/><br/>
               <input type="submit" value="Login">
           </form>
-          <p>
+
             <a href="{{ url_for('signup') }}">New customer? Sign up now!</a>
-          </p>
+          </div>
       </div>
    </body>
 

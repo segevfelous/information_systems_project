@@ -3,7 +3,7 @@
 <html lang="en">
 <head>
   <title>Sign Up</title>
-  <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='styles.css') }}">
+  <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 
@@ -25,6 +25,79 @@
       <br/><br/>
       <input placeholder="Password" type="password" name="password" required>
       <br/><br/>
+
+      <div class="phone-section">
+  <h3>Phone Numbers</h3>
+
+  <div id="phones-container">
+    <input
+      type="text"
+      name="phone"
+      placeholder="Phone number (Required)"
+      required
+      class="phone-input"
+    />
+  </div>
+
+  <button type="button" id="add-phone-btn" class="add-phone-btn">
+    + Add another phone
+  </button>
+</div>
+
+<script>
+  (function () {
+    const container = document.getElementById("phones-container");
+    const addBtn = document.getElementById("add-phone-btn");
+
+    addBtn.addEventListener("click", function () {
+      const input = document.createElement("input");
+      input.type = "text";
+      input.name = "phone"; // חשוב: אותו name כדי ש-getlist יעבוד
+      input.placeholder = "Phone number (Required)";
+      input.className = "phone-input";
+      container.appendChild(input);
+    });
+  })();
+</script>
+
+<style>
+  .phone-section {
+    margin-top: 16px;
+  }
+
+  #phones-container {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 10px;
+    margin-bottom: 12px;
+  }
+
+  .phone-input {
+    width: 100%;
+    padding: 12px 14px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 14px;
+    box-sizing: border-box;
+  }
+
+  .add-phone-btn {
+    width: 100%;
+    padding: 12px 14px;
+    border: none;
+    border-radius: 10px;
+    background: #4b5563; /* אפור כהה כמו בתמונה */
+    color: white;
+    font-size: 14px;
+    cursor: pointer;
+  }
+
+  .add-phone-btn:hover {
+    filter: brightness(0.95);
+  }
+</style>
+
 
       <input type="submit" value="Create account">
     </form>

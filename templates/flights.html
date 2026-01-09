@@ -1,37 +1,194 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <meta charset="UTF-8">
   <title>Available Flights</title>
+
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 
+  <style>
+    body{
+      margin:0;
+      font-family: Arial, Helvetica, sans-serif;
+      background:#F6F8FC;
+      color:#0E1D2D;
+    }
+
+    .page{
+      width:100%;
+      max-width:none;
+      padding:40px 32px;
+    }
+
+    .card{
+      width:100%;
+      max-width:none;
+      background:#fff;
+      border-radius:22px;
+      padding:26px;
+      box-shadow:0 14px 36px rgba(14,29,45,0.12);
+      border:1px solid #E6EBF3;
+    }
+
+    h1{
+      margin:0 0 16px;
+      font-size:28px;
+    }
+
+    form{
+      display:grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap:14px;
+      margin-bottom:20px;
+      align-items:end;
+    }
+
+    label{
+      font-weight:bold;
+      font-size:14px;
+      margin-bottom:6px;
+      display:block;
+    }
+
+    input{
+      width:100%;
+      padding:12px 14px;
+      border-radius:12px;
+      border:1px solid #E6EBF3;
+      font-size:14px;
+      box-sizing:border-box;
+    }
+
+    input:focus{
+      outline:none;
+      border-color:#6F5BFF;
+      box-shadow:0 0 0 3px rgba(201,182,255,0.5);
+    }
+
+    .form-actions{
+      display:flex;
+      gap:12px;
+    }
+
+    .btn{
+      padding:12px 14px;
+      border-radius:14px;
+      font-weight:bold;
+      cursor:pointer;
+      border:1px solid transparent;
+      text-decoration:none;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      font-size:14px;
+    }
+
+    .btn-primary{
+      background:#4A7A87;
+      color:white;
+    }
+
+    .btn-primary:hover{
+      background:#2E4D5C;
+    }
+
+    .btn-ghost{
+      background:white;
+      color:#0E1D2D;
+      border-color:#E6EBF3;
+    }
+
+    .btn-ghost:hover{
+      background:rgba(201,182,255,.18);
+    }
+
+    table{
+      width:100%;
+      border-collapse:collapse;
+      margin-top:16px;
+      font-size:14px;
+    }
+
+    th{
+      background:#F1F4FA;
+      text-align:left;
+      padding:10px;
+      border-bottom:2px solid #E6EBF3;
+    }
+
+    td{
+      padding:10px;
+      border-bottom:1px solid #E6EBF3;
+      vertical-align:top;
+    }
+
+    tr:hover{
+      background:#FAFBFE;
+    }
+
+    .seat-link{
+      display:inline-block;
+      margin-top:6px;
+      color:#4A7A87;
+      font-weight:bold;
+      text-decoration:none;
+    }
+
+    .seat-link:hover{
+      text-decoration:underline;
+    }
+
+    .muted{
+      color:#546275;
+      margin-top:10px;
+    }
+
+    @media(max-width:900px){
+      form{
+        grid-template-columns:1fr 1fr;
+      }
+    }
+
+    @media(max-width:600px){
+      form{
+        grid-template-columns:1fr;
+      }
+    }
+  </style>
 </head>
+
 <body>
-  <div>
+<div class="page">
+  <div class="card">
+
     <h1>Available Flights (Open for sale)</h1>
 
     <form method="GET" action="/flights">
-      <label>Date:</label>
-      <input type="date" name="flight_date" value="{{ flight_date }}">
-      <br><br>
+      <div>
+        <label>Date</label>
+        <input type="date" name="flight_date" value="{{ flight_date }}">
+      </div>
 
-      <label>From (Airport):</label>
-      <input type="text" name="departure_airport" maxlength="3" placeholder="TLV" value="{{ departure_airport }}">
-      <br><br>
+      <div>
+        <label>From (Airport)</label>
+        <input type="text" name="departure_airport" maxlength="3" placeholder="TLV" value="{{ departure_airport }}">
+      </div>
 
-      <label>To (Airport):</label>
-      <input type="text" name="destination_airport" maxlength="3" placeholder="ATH" value="{{ destination_airport }}">
-      <br><br>
+      <div>
+        <label>To (Airport)</label>
+        <input type="text" name="destination_airport" maxlength="3" placeholder="ATH" value="{{ destination_airport }}">
+      </div>
 
-      <input type="submit" value="Search">
-      <a href="/flights">Reset</a>
+      <div class="form-actions">
+        <button class="btn btn-primary" type="submit">Search</button>
+        <a class="btn btn-ghost" href="/flights">Reset</a>
+      </div>
     </form>
 
-    <br>
-
     {% if flights|length == 0 %}
-      <p>No active flights found for your filters.</p>
+      <p class="muted">No active flights found for your filters.</p>
     {% else %}
-      <table border="1" cellpadding="8">
+      <table>
         <thead>
           <tr>
             <th>Date</th>
@@ -41,32 +198,36 @@
             <th>To</th>
             <th>Plane ID</th>
             <th>Status</th>
+            <th>Seats</th>
           </tr>
         </thead>
         <tbody>
-          {% for f in flights %}
-            <tr>
-              <td>{{ f.Flight_Date }}</td>
-              <td>{{ f.Departure_Time }}</td>
-              <td>{{ f.Landing_Time }}</td>
-              <td>{{ f.Departure_Airport }}</td>
-              <td>{{ f.Destination_Airport }}</td>
-              <td>{{ f.Plane_ID }}</td>
-              <td>{{ f.status }}</td>
-              <br>
-              <a href="/seats?flight_date={{ f.Flight_Date }}&departure_time={{ f.Departure_Time }}">
-              Seats for {{ f.Departure_Airport }} → {{ f.Destination_Airport }}
-              ({{ f.Flight_Date }} {{ f.Departure_Time }})
-                <br><br>
+        {% for f in flights %}
+          <tr>
+            <td>{{ f.Flight_Date }}</td>
+            <td>{{ f.Departure_Time }}</td>
+            <td>{{ f.Landing_Time }}</td>
+            <td>{{ f.Departure_Airport }}</td>
+            <td>{{ f.Destination_Airport }}</td>
+            <td>{{ f.Plane_ID }}</td>
+            <td>{{ f.status }}</td>
+            <td>
+              <a class="seat-link"
+                 href="/seats?flight_date={{ f.Flight_Date }}&departure_time={{ f.Departure_Time }}">
+                Select seats
               </a>
-            </tr>
-          {% endfor %}
+            </td>
+          </tr>
+        {% endfor %}
         </tbody>
       </table>
     {% endif %}
 
-    <br>
-    <a href="/">Back to home</a>
+    <div style="margin-top:20px;">
+      <a class="btn btn-ghost" href="/">Back to home</a>
+    </div>
+
   </div>
+</div>
 </body>
 </html>

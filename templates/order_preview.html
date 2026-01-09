@@ -3,67 +3,257 @@
 <head>
   <meta charset="UTF-8">
   <title>order Preview</title>
-<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 
   <style>
-    .box{max-width:900px;margin:20px auto;padding:14px;border:1px solid #ddd;border-radius:12px;}
-    table{width:100%;border-collapse:collapse;margin-top:10px;}
-    th,td{border:1px solid #eee;padding:8px;text-align:left;}
-    .warning{color:#b00020;}
-    .actions{margin-top:14px;display:flex;gap:10px;align-items:center;}
-    .actions button{padding:10px 14px;border-radius:10px;border:1px solid #bbb;cursor:pointer;}
-    input{padding:10px;border-radius:10px;border:1px solid #bbb;width:100%;max-width:360px;}
+    body{
+      margin:0;
+      font-family: Arial, Helvetica, sans-serif;
+      background:#F6F8FC;
+      color:#0E1D2D;
+    }
+
+    .page{
+      width:100%;
+      max-width:none;
+      padding:40px 32px;
+    }
+
+    .card{
+      width:100%;
+      max-width: 980px;
+      margin: 0 auto;
+      background:#fff;
+      border-radius:22px;
+      padding:26px;
+      box-shadow:0 14px 36px rgba(14,29,45,0.12);
+      border:1px solid #E6EBF3;
+    }
+
+    h1{
+      margin:0 0 10px;
+      font-size:28px;
+    }
+
+    h2{
+      margin:18px 0 10px;
+      font-size:20px;
+    }
+
+    .muted{
+      color:#546275;
+      font-size:14px;
+      margin: 0 0 10px;
+    }
+
+    .meta{
+      background: rgba(201,182,255,.12);
+      border: 1px solid rgba(201,182,255,.45);
+      border-radius: 16px;
+      padding: 14px;
+      margin-top: 14px;
+    }
+
+    .meta p{
+      margin: 6px 0;
+      font-size:14px;
+    }
+
+    table{
+      width:100%;
+      border-collapse:collapse;
+      margin-top:12px;
+      font-size:14px;
+    }
+
+    th{
+      background:#F1F4FA;
+      text-align:left;
+      padding:10px;
+      border-bottom:2px solid #E6EBF3;
+      white-space:nowrap;
+    }
+
+    td{
+      padding:10px;
+      border-bottom:1px solid #E6EBF3;
+      vertical-align:top;
+    }
+
+    tr:hover{
+      background:#FAFBFE;
+    }
+
+    .total{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      background:#0E1D2D;
+      color:#fff;
+      border-radius:18px;
+      padding:14px 16px;
+      margin-top: 12px;
+    }
+
+    .total strong{
+      font-size:18px;
+    }
+
+    .warning{
+      background: rgba(201,182,255,.22);
+      border: 1px solid rgba(201,182,255,.6);
+      color:#0E1D2D;
+      padding:10px 12px;
+      border-radius:14px;
+      margin: 10px 0 12px;
+      font-weight:bold;
+      font-size:14px;
+    }
+
+    label{
+      display:block;
+      font-weight:bold;
+      font-size:14px;
+      margin:10px 0 6px;
+    }
+
+    input{
+      width:100%;
+      max-width:420px;
+      padding:12px 14px;
+      border-radius:12px;
+      border:1px solid #E6EBF3;
+      font-size:14px;
+      box-sizing:border-box;
+    }
+
+    input:focus{
+      outline:none;
+      border-color:#6F5BFF;
+      box-shadow:0 0 0 3px rgba(201,182,255,0.5);
+    }
+
+    .actions{
+      margin-top:16px;
+      display:flex;
+      gap:12px;
+      align-items:center;
+      flex-wrap:wrap;
+    }
+
+    .btn{
+      padding:12px 14px;
+      border-radius:14px;
+      font-weight:bold;
+      cursor:pointer;
+      border:1px solid transparent;
+      text-decoration:none;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      font-size:14px;
+    }
+
+    .btn-primary{
+      background:#4A7A87;
+      color:white;
+    }
+
+    .btn-primary:hover{
+      background:#2E4D5C;
+    }
+
+    .btn-ghost{
+      background:white;
+      color:#0E1D2D;
+      border-color:#E6EBF3;
+    }
+
+    .btn-ghost:hover{
+      background:rgba(201,182,255,.18);
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:12px;
+      max-width: 900px;
+    }
+
+    @media(max-width:700px){
+      .grid{ grid-template-columns: 1fr; }
+      .card{ padding:20px; }
+    }
   </style>
 </head>
+
 <body>
+<div class="page">
+  <div class="card">
 
-<div class="box">
-  <h1>order Preview</h1>
+    <h1>order Preview</h1>
 
-  <p><b>order code:</b> {{ order_code }}</p>
-  <p><b>Email:</b> {{ email }}</p>
-
-  <p><b>Flight:</b> {{ flight_date }} {{ departure_time }} | {{ flight.Departure_Airport }} → {{ flight.Destination_Airport }}</p>
-
-  <h2>Selected seats</h2>
-  <table>
-    <thead>
-      <tr>
-        <th>Seat</th>
-        <th>Class</th>
-        <th>Price</th>
-      </tr>
-    </thead>
-    <tbody>
-    {% for s in seat_items %}
-      <tr>
-        <td>{{ s.seat }}</td>
-        <td>{{ s.class }}</td>
-        <td>{{ s.price }}$</td>
-      </tr>
-    {% endfor %}
-    </tbody>
-  </table>
-
-  <h2>Total</h2>
-  <p><b>{{ total_price }}$</b></p>
-
-  <form method="POST" action="/order/confirm">
-    {% if need_unreg_details %}
-      <h2>We don’t recognize this email — please enter details</h2>
-      <div class="warning">All fields are required</div>
-      <p><input name="fname" placeholder="First name" required></p>
-      <p><input name="lname" placeholder="Last name" required></p>
-      <p><input name="phone_number" placeholder="Phone_number" required></p>
-    {% endif %}
-
-    <div class="actions">
-      <button type="submit">Confirm order</button>
-      <a href="/session/clear">Cancel</a>
+    <div class="meta">
+      <p><b>order code:</b> {{ order_code }}</p>
+      <p><b>Email:</b> {{ email }}</p>
+      <p><b>Flight:</b> {{ flight_date }} {{ departure_time }} | {{ flight.Departure_Airport }} → {{ flight.Destination_Airport }}</p>
     </div>
-  </form>
-</div>
 
+    <h2>Selected seats</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Seat</th>
+          <th>Class</th>
+          <th>Price</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for s in seat_items %}
+        <tr>
+          <td>{{ s.seat }}</td>
+          <td>{{ s.class }}</td>
+          <td>{{ s.price }}$</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+
+    <h2>Total</h2>
+    <div class="total">
+      <div>Total to pay</div>
+      <strong>{{ total_price }}$</strong>
+    </div>
+
+    <form method="POST" action="/order/confirm">
+      {% if need_unreg_details %}
+        <h2>We don’t recognize this email — please enter details</h2>
+        <div class="warning">All fields are required</div>
+
+        <div class="grid">
+          <div>
+            <label>First name</label>
+            <input name="fname" placeholder="First name" required>
+          </div>
+          <div>
+            <label>Last name</label>
+            <input name="lname" placeholder="Last name" required>
+          </div>
+          <div>
+            <label>Phone_number</label>
+            <input name="phone_number" placeholder="Phone_number" required>
+          </div>
+        </div>
+      {% endif %}
+
+      <div class="actions">
+        <button class="btn btn-primary" type="submit">Confirm order</button>
+        <a class="btn btn-ghost" href="/session/clear">Cancel</a>
+      </div>
+    </form>
+
+  </div>
+</div>
 </body>
 </html>
