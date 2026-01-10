@@ -49,6 +49,11 @@ mydb = mysql.connector.connect(
     autocommit=True
 )
 
+def ensure_mydb_is_connected():
+    global mydb
+    if not mydb.is_connected():
+        mydb.reconnect(attempts=3, delay=2)
+
 @app.route("/")
 def homepage():
         return render_template("Homepage.html")
@@ -65,6 +70,7 @@ def login():
         email = request.form.get("email")
         pw = request.form.get("password")
 
+        ensure_mydb_is_connected()
         cur = mydb.cursor()
         cur.execute("SELECT `password` FROM `registered_customers` WHERE `email` = %s",(email,))
         row = cur.fetchone()
@@ -116,6 +122,7 @@ def signup():
             seen.add(p)
             clean_phones.append(p)
 
+        ensure_mydb_is_connected()
         cur = mydb.cursor()
 
         cur.execute("SELECT 1 FROM `registered_customers` WHERE `email` = %s", (email,))
@@ -176,6 +183,7 @@ def flights():
 
     sql += " ORDER BY Flight_Date, Departure_Time"
 
+    ensure_mydb_is_connected()
     cur = mydb.cursor(dictionary=True)
     cur.execute(sql, params)
     flights_rows = cur.fetchall()
@@ -199,6 +207,7 @@ def seats():
     flight_date = request.args.get("flight_date")
     departure_time = request.args.get("departure_time")
 
+    ensure_mydb_is_connected()
     cur = mydb.cursor(dictionary=True)
 
     # 1️⃣ שליפת המטוס של הטיסה
@@ -296,6 +305,7 @@ def order_new():
     if not flight_date or not departure_time:
         return "Missing flight_date or departure_time", 400
 
+    ensure_mydb_is_connected()
     cur = mydb.cursor(dictionary=True)
 
     # flight + plane
@@ -393,6 +403,7 @@ def seat_to_row_col(seat_code: str):
 
 def generate_booking_code(cur):
     # booking_code אצלך INT => נייצר 6 ספרות שלא קיימות
+    ensure_mydb_is_connected()
     while True:
         code = random.randint(100000, 999999)
         cur.execute("SELECT 1 FROM bookings WHERE booking_code=%s LIMIT 1", (code,))
@@ -401,6 +412,7 @@ def generate_booking_code(cur):
 
 def get_class_ranges(cur, plane_id):
     # מחזיר טווחי שורות רציפים לכל מחלקה (Business ואז Economy)
+    ensure_mydb_is_connected()
     cur.execute("""
         SELECT Class_Type, Number_of_Rows, Number_of_Columns
         FROM Classes
@@ -460,6 +472,7 @@ def order_preview():
             return f"Bad seat code: {code}", 400
         seats.append(rc)  # (row,col)
 
+    ensure_mydb_is_connected()
     cur = mydb.cursor(dictionary=True)
 
     # flight + plane
@@ -570,6 +583,7 @@ def order_confirm():
     lname = request.form.get("lname", "").strip()
     phone_number = request.form.get("phone_number", "").strip()
 
+    ensure_mydb_is_connected()
     cur = mydb.cursor(dictionary=True)
 
     try:
@@ -658,6 +672,7 @@ def my_bookings():
         return render_template("my_booking.html", email="", upcoming=[], history=[], message="")
 
     # משתמש רשום = אימייל שקיים ב-registered_customers
+    ensure_mydb_is_connected()
     cur0 = mydb.cursor()
     cur0.execute("SELECT 1 FROM registered_customers WHERE email=%s LIMIT 1", (email,))
     is_registered = cur0.fetchone() is not None
@@ -736,6 +751,7 @@ def booking_cancel():
     if not booking_code or not page_email:
         return "Missing booking_code or email", 400
 
+    ensure_mydb_is_connected()
     cur = mydb.cursor(dictionary=True)
 
     try:
@@ -841,6 +857,7 @@ def admin_login():
     if not admin_id.isdigit():
         return render_template("admin_login.html", message="ID must be a number")
 
+    ensure_mydb_is_connected()
     cur = mydb.cursor(dictionary=True)
     cur.execute("""
         SELECT ID, fname, lname, password
@@ -875,6 +892,7 @@ def admin_dashboard():
     if session.get("role") != "admin":   # ✅ החלפה כאן
         return redirect("/admin_login")
 
+    ensure_mydb_is_connected()
     cur = mydb.cursor(dictionary=True)
 
     cur.execute("""
@@ -923,6 +941,7 @@ def admin_dashboard():
 
 @app.route("/admin_add_flight", methods=["GET", "POST"])
 def admin_add_flight():
+    ensure_mydb_is_connected()
     if not session.get("admin_id"):
         return redirect("/admin_login")
 
@@ -969,6 +988,7 @@ def admin_add_flight():
 
 
 def add_flight_with_rules(mydb, flight_date, departure_time, plane_id, landing_time, dep_airport, dest_airport, status="active"):
+    ensure_mydb_is_connected()
     cur = mydb.cursor(dictionary=True)
     try:
         # build a flight_row-like dict for validation
@@ -1010,6 +1030,7 @@ def add_flight_with_rules(mydb, flight_date, departure_time, plane_id, landing_t
 
 
 def assign_staff_to_flight_with_rules(mydb, flight_date, departure_time, plane_id, staff_id):
+    ensure_mydb_is_connected()
     cur = mydb.cursor(dictionary=True)
     try:
         flight_row = fetch_flight(cur, flight_date, departure_time, plane_id)
@@ -1042,6 +1063,7 @@ def assign_staff_to_flight_with_rules(mydb, flight_date, departure_time, plane_i
     finally:
         cur.close()
 def lock_booking_price_after_tickets(mydb, booking_code, flight_date, departure_time, plane_id, base_per_hour=120.0):
+    ensure_mydb_is_connected()
     cur = mydb.cursor(dictionary=True)
     try:
         total = lock_total_price_at_booking_time(
@@ -1073,6 +1095,7 @@ def admin_cancel_flight():
     if not flight_date or not departure_time:
         return "Missing flight_date or departure_time", 400
 
+    ensure_mydb_is_connected()
     cur = mydb.cursor(dictionary=True)
     try:
         mydb.start_transaction()
