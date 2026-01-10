@@ -21,7 +21,8 @@ app = Flask(__name__)
 
 app.config.update(
     SESSION_TYPE="filesystem",
-    SESSION_FILE_DIR="flask_session_data",   # עדיף תיקייה יחסית בפרויקט
+    # SESSION_FILE_DIR="flask_session_data",   # if using local
+    SESSION_FILE_DIR="/home/segev/information_systems_project/flask_session_data",   # if using python anywhere
     SESSION_PERMANENT=True,
     PERMANENT_SESSION_LIFETIME=timedelta(minutes=10),
     SESSION_REFRESH_EACH_REQUEST=True,
@@ -1139,5 +1140,5 @@ def admin_cancel_flight():
 
 
 
-if __name__ == "__main__":
-    app.run(debug=True)
+# if __name__ == "__main__": # uncomment if using local
+    # app.run(debug=True)
