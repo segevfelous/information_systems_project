@@ -22,7 +22,7 @@ app = Flask(__name__)
 app.config.update(
     SESSION_TYPE="filesystem",
     # SESSION_FILE_DIR="flask_session_data",   # if using local
-    SESSION_FILE_DIR="/home/segev/information_systems_project/flask_session_data",   # if using python anywhere
+    SESSION_FILE_DIR="/home/segev/information_systems_project/flask_session_data",   # if using pythonanywhere
     SESSION_PERMANENT=True,
     PERMANENT_SESSION_LIFETIME=timedelta(minutes=10),
     SESSION_REFRESH_EACH_REQUEST=True,
@@ -33,13 +33,13 @@ Session(app)
 
 mydb = mysql.connector.connect(
 
-    #### Using Local ####
+    #### if using local ####
     # host="localhost",
     # user="root",
     # password="root",
     # database="flytau",
 
-    #### Using python-anywhere ####
+    #### if using pythonanywhere ####
     host= "segev.mysql.pythonanywhere-services.com",
     user="segev",
     password="Amit1111",
@@ -1140,5 +1140,5 @@ def admin_cancel_flight():
 
 
 
-# if __name__ == "__main__": # uncomment if using local
+# if __name__ == "__main__": # uncomment if using local, comment if using pythonanywhere.
     # app.run(debug=True)
