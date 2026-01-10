@@ -31,10 +31,20 @@ app.config.update(
 Session(app)
 
 mydb = mysql.connector.connect(
-    host="localhost",
-    user="root",
-    password="root",
-    database="flytau",
+
+    #### Using Local ####
+    # host="localhost",
+    # user="root",
+    # password="root",
+    # database="flytau",
+
+    #### Using python-anywhere ####
+    host= "segev.mysql.pythonanywhere-services.com",
+    user="segev",
+    password="Amit1111",
+    database="segev$flytau_DB",
+
+    #### General ####
     autocommit=True
 )
 
