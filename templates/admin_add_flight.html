@@ -5,42 +5,180 @@
   <title>Add Flight</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+  <style>
+    body{ margin:0; font-family: Arial, Helvetica, sans-serif; background:#F6F8FC; color:#0E1D2D; }
+    .page{ width: 100%; max-width: 980px; margin: 40px auto; padding: 0 32px; }
+    .card{ background:#fff; border-radius:22px; padding:26px; box-shadow:0 14px 36px rgba(14,29,45,0.12); border:1px solid #E6EBF3; }
+    h1{ margin:0 0 14px; font-size:24px; }
+    label{ font-size:13px; color:#546275; display:block; margin:12px 0 6px; font-weight:bold; }
+    input, select{ width:100%; padding:11px 12px; border-radius:14px; border:1px solid #E6EBF3; background:#fff; outline:none; font-size:14px; box-sizing:border-box; }
+    .row{ display:grid; grid-template-columns: 1fr 1fr; gap:14px; }
+    .btn{ padding:10px 14px; border-radius:14px; font-weight:bold; cursor:pointer; border:1px solid transparent; text-decoration:none; display:inline-block; text-align:center; margin-top:16px; }
+    .btn-primary{ background:#4A7A87; color:white; } .btn-primary:hover{ background:#2E4D5C; }
+    .btn-accent{ background:rgba(201,182,255,.4); color:#0E1D2D; border-color:rgba(201,182,255,.7); }
+    .muted{ color:#546275; font-size:14px; margin-top:10px; }
+    .error{ color:#b00020; font-weight:bold; margin-top:10px; }
+    .success{ color:#0b6b3a; font-weight:bold; margin-top:10px; }
+    .listbox{ border:1px solid #E6EBF3; border-radius:14px; padding:10px; margin-top:8px; max-height:220px; overflow:auto; background:#fff; }
+    .item{ display:flex; gap:10px; align-items:center; padding:6px 4px; border-bottom:1px solid #F1F4FA; font-size:14px; }
+    .item:last-child{ border-bottom:none; }
+    .actions{ display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
+    @media(max-width:760px){ .row{ grid-template-columns:1fr; } }
+  </style>
 </head>
 
 <body>
-  <div>
-    <div>
+  <div class="page">
+    <div class="card">
 
       <h1>Add New Flight</h1>
 
-      {% if message %}
-        <p class="muted">{{ message }}</p>
+      {% if error %}<div class="error">{{ error }}</div>{% endif %}
+      {% if success %}<div class="success">{{ success }}</div>{% endif %}
+
+      <!-- ================= STEP 1 (לא לשנות) ================= -->
+      {% if not step or step == 1 %}
+        <form method="POST" action="/admin_add_flight">
+          <input type="hidden" name="step" value="1">
+
+          <div class="row">
+            <div>
+              <label>Flight Date*</label>
+              <input type="date" name="flight_date" required value="{{ selected_flight_date or '' }}">                    </div>
+            <div>
+              <label>Departure Time*</label>
+              <input type="time" name="departure_time" required value="{{ selected_departure_time or '' }}">
+            </div>
+          </div>
+
+          <div class="row">
+            <div>
+              <label>Departure Airport*</label>
+              <select name="departure_airport" required>
+                <option value="" selected disabled>Choose...</option>
+                {% for code in airports %}
+                  <option value="{{ code }}" {% if selected_dep_airport and code == selected_dep_airport %}selected{% endif %}>
+                    {{ code }}
+                  </option>
+                {% endfor %}
+
+              </select>
+            </div>
+            <div>
+              <label>Destination Airport*</label>
+              <select name="destination_airport" required>
+                <option value="" selected disabled>Choose...</option>
+                {% for code in airports %}
+                  <option value="{{ code }}" {% if selected_dest_airport and code == selected_dest_airport %}selected{% endif %}>
+                    {{ code }}
+                  </option>
+                {% endfor %}
+
+              </select>
+            </div>
+          </div>
+
+            <div class="actions">
+            {% if show_back_only %}
+              <a class="btn btn-primary" href="/admin_dashboard">Back to Dashboard</a>
+            {% else %}
+              <button class="btn btn-primary" type="submit">Next: Choose Plane</button>
+              <a class="btn btn-accent" href="/admin_dashboard">Back</a>
+            {% endif %}
+
+          </div>
+        </form>
       {% endif %}
 
-      <form method="POST" action="/admin_add_flight">
+      <!-- ================= STEP 2 (choose plane only) ================= -->
+      {% if step == 2 %}
+        <div class="muted">
+          Selected: <b>{{ flight_date }}</b> at <b>{{ departure_time }}</b>,
+          {{ departure_airport }} → {{ destination_airport }}
+          {% if landing_time %} (Landing: {{ landing_time }}) {% endif %}
+        </div>
 
-        <label>Flight Date (YYYY-MM-DD)*</label>
-        <input type="date" name="flight_date" required>
+        <form method="POST" action="/admin_add_flight">
+          <input type="hidden" name="step" value="2">
+          <input type="hidden" name="flight_date" value="{{ flight_date }}">
+          <input type="hidden" name="departure_time" value="{{ departure_time }}">
+          <input type="hidden" name="departure_airport" value="{{ departure_airport }}">
+          <input type="hidden" name="destination_airport" value="{{ destination_airport }}">
 
-        <label>Departure Time (HH:MM)*</label>
-        <input type="time" name="departure_time" required>
+          <label>Choose Plane (available at origin & time)*</label>
+          <select name="plane_id" required>
+            <option value="" disabled {% if not selected_plane_id %}selected{% endif %}>Choose...</option>
+            {% for pid in available_planes %}
+              <option value="{{ pid }}" {% if selected_plane_id and (pid|string) == (selected_plane_id|string) %}selected{% endif %}>{{ pid }}</option>
+            {% endfor %}
+          </select>
 
-        <label>Landing Time (HH:MM)</label>
-        <input type="time" name="landing_time">
+          <div class="actions">
+            <button class="btn btn-primary" type="submit">Next: Choose Crew</button>
+            <a class="btn btn-accent" href="/admin_add_flight">Start Over</a>
+            <a class="btn btn-accent" href="/admin_dashboard">Back</a>
+          </div>
+        </form>
+      {% endif %}
 
-        <label>Plane ID*</label>
-        <input type="number" name="plane_id" required>
+      <!-- ================= STEP 3 (choose crew; requirements known) ================= -->
+      {% if step == 3 %}
+        <div class="muted">
+          Selected: <b>{{ flight_date }}</b> at <b>{{ departure_time }}</b>,
+          {{ departure_airport }} → {{ destination_airport }}
+          {% if landing_time %} (Landing: {{ landing_time }}) {% endif %}
+        </div>
 
-        <label>Departure Airport (3 letters)*</label>
-        <input type="text" name="departure_airport" maxlength="3" required>
+        {% if req_text %}
+          <div class="muted"><b>{{ req_text }}</b></div>
+        {% endif %}
 
-        <label>Destination Airport (3 letters)*</label>
-        <input type="text" name="destination_airport" maxlength="3" required>
+        <form method="POST" action="/admin_add_flight">
+          <input type="hidden" name="step" value="3">
+          <input type="hidden" name="flight_date" value="{{ flight_date }}">
+          <input type="hidden" name="departure_time" value="{{ departure_time }}">
+          <input type="hidden" name="departure_airport" value="{{ departure_airport }}">
+          <input type="hidden" name="destination_airport" value="{{ destination_airport }}">
+          <input type="hidden" name="plane_id" value="{{ selected_plane_id }}">
 
-        <button type="submit">Create Flight</button>
+          <label>Available Pilots — <b>select exactly {{ req_pilots }}</b></label>
+          <div class="listbox">
+            {% if available_pilots|length == 0 %}
+              <div class="muted">No available pilots.</div>
+            {% else %}
+              {% for p in available_pilots %}
+                <div class="item">
+                  <input type="checkbox" name="pilot_ids" value="{{ p.id }}"
+                    {% if selected_pilot_ids and (p.id in selected_pilot_ids) %}checked{% endif %}>
+                  <div>#{{ p.id }} — {{ p.fname }} {{ p.lname }}</div>
+                </div>
+              {% endfor %}
+            {% endif %}
+          </div>
 
-        <a href="/admin_dashboard">Back</a>
-      </form>
+          <label>Available Flight Attendants — <b>select exactly {{ req_attendants }}</b></label>
+          <div class="listbox">
+            {% if available_attendants|length == 0 %}
+              <div class="muted">No available attendants.</div>
+            {% else %}
+              {% for a in available_attendants %}
+                <div class="item">
+                  <input type="checkbox" name="attendant_ids" value="{{ a.id }}"
+                    {% if selected_attendant_ids and (a.id in selected_attendant_ids) %}checked{% endif %}>
+                  <div>#{{ a.id }} — {{ a.fname }} {{ a.lname }}</div>
+                </div>
+              {% endfor %}
+            {% endif %}
+          </div>
+
+          <div class="actions">
+            <button class="btn btn-primary" type="submit">Create Flight</button>
+            <a class="btn btn-accent" href="/admin_add_flight">Start Over</a>
+            <a class="btn btn-accent" href="/admin_dashboard">Back</a>
+          </div>
+        </form>
+      {% endif %}
 
     </div>
   </div>

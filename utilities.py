@@ -41,12 +41,12 @@ def fetch_plane_size(cur, plane_id):
 
 def fetch_booking(cur, booking_code: int):
     """
-    Bookings (booking_code, F-email, status, total_price)
+    Bookings (booking_code, email, status, total_price)
     """
     cur.execute("""
         SELECT
             `booking_code` AS booking_code,
-            `F-email`      AS email,
+            `email`      AS email,
             `status`       AS status,
             `total_price`  AS total_price
         FROM `Bookings`
@@ -165,7 +165,7 @@ def is_long_flight(cur, flight_row) -> bool:
 
 
 # =========================================================
-# D) Rule: long flight must be BIG plane
+# D) Rule: long flight must be Large plane
 # =========================================================
 
 def validate_long_flight_plane_size(cur, flight_row) -> None:
@@ -176,8 +176,8 @@ def validate_long_flight_plane_size(cur, flight_row) -> None:
     if not plane_size:
         raise ValueError("Plane not found")
 
-    if is_long_flight(cur, flight_row) and plane_size.strip().lower() != "big":
-        raise ValueError("Long flight (6h+) must use a BIG plane")
+    if is_long_flight(cur, flight_row) and plane_size.strip().lower() != "large":
+        raise ValueError("Long flight (6h+) must use a large plane")
 
 
 # =========================================================
@@ -190,7 +190,7 @@ def required_crew_by_plane_size(plane_size: str):
     מטוס קטן: 2 טייסים ו-3 דיילים
     """
     s = (plane_size or "").strip().lower()
-    if s == "big":
+    if s == "large":
         return {"pilots": 3, "attendants": 6}
     return {"pilots": 2, "attendants": 3}
 
@@ -225,7 +225,7 @@ def staff_ids_on_flight(cur, flight_date, departure_time, plane_id):
     cur.execute("""
         SELECT `ID` AS staff_id
         FROM `Staff_On_Flight`
-        WHERE `Flight_Date`=%s AND `Departure_Time`=%s AND `F- plane ID`=%s
+        WHERE `Flight_Date`=%s AND `Departure_Time`=%s AND `plane_ID`=%s
     """, (flight_date, departure_time, int(plane_id)))
     return [r["staff_id"] for r in (cur.fetchall() or [])]
 
@@ -272,7 +272,7 @@ def staff_assigned_flights(cur, staff_id: int):
         JOIN `Flights` f
           ON f.`Flight_Date`=sof.`flight_date`
          AND f.`Departure_Time`=sof.`departure_time`
-         AND f.`Plane_ID`=sof.`plane ID`
+         AND f.`Plane_ID`=sof.`plane_ID`
         WHERE sof.`ID`=%s
     """, (int(staff_id),))
     return cur.fetchall() or []
@@ -528,3 +528,11 @@ def update_completed_flights(mydb):
     finally:
         cur.close()
 
+def fetch_airports_from_flight_duration(cur):
+    cur.execute("""
+        SELECT DISTINCT Departure_Airport AS code FROM Flight_Duration
+        UNION
+        SELECT DISTINCT Destination_Airport AS code FROM Flight_Duration
+        ORDER BY code
+    """)
+    return [r["code"] for r in (cur.fetchall() or [])]

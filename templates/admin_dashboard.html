@@ -15,30 +15,29 @@
     }
 
     .page{
-    width: 100%;
-    max-width: none;
-    margin: 40px auto;
-    padding: 0 32px;
-  }
+      width: 100%;
+      max-width: none;
+      margin: 40px auto;
+      padding: 0 32px;
+    }
 
-  .card{
-    width: 100%;
-    max-width: none;
-    background:#fff;
-    border-radius:22px;
-    padding:26px;
-    box-shadow:0 14px 36px rgba(14,29,45,0.12);
-    border:1px solid #E6EBF3;
-  }
-
-
+    .card{
+      width: 100%;
+      max-width: none;
+      background:#fff;
+      border-radius:22px;
+      padding:26px;
+      box-shadow:0 14px 36px rgba(14,29,45,0.12);
+      border:1px solid #E6EBF3;
+    }
 
     .topbar{
       display:flex;
       justify-content:space-between;
-      align-items:center;
+      align-items:flex-start;
       gap:16px;
       margin-bottom:20px;
+      flex-wrap:wrap;
     }
 
     h1{
@@ -59,6 +58,7 @@
       display:flex;
       align-items:center;
       gap:12px;
+      flex-wrap:wrap;
     }
 
     .btn{
@@ -70,6 +70,7 @@
       text-decoration:none;
       display:inline-block;
       text-align:center;
+      white-space:nowrap;
     }
 
     .btn-primary{
@@ -130,6 +131,35 @@
       color:#546275;
     }
 
+    /* ✅ filter row */
+    .filter-row{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      flex-wrap:wrap;
+      margin-top:10px;
+    }
+
+    .filter-row label{
+      font-size:13px;
+      color:#546275;
+      font-weight:bold;
+    }
+
+    select{
+      padding:10px 12px;
+      border-radius:14px;
+      border:1px solid #E6EBF3;
+      background:#fff;
+      outline:none;
+      font-size:14px;
+    }
+
+    select:focus{
+      border-color: rgba(74,122,135,.65);
+      box-shadow: 0 0 0 4px rgba(74,122,135,.12);
+    }
+
     @media(max-width:900px){
       table{
         font-size:13px;
@@ -146,10 +176,31 @@
       <div>
         <h1>Admin Dashboard</h1>
         <div class="muted">Welcome, <b>{{ admin_name }}</b></div>
+
+        <!-- ✅ סינון לפי סטטוס (GET) -->
+        <form class="filter-row" method="GET" action="/admin_dashboard">
+          <label for="status">Filter by status:</label>
+
+          <select id="status" name="status">
+            <option value="all" {% if (selected_status|string)|lower == "all" %}selected{% endif %}>All</option>
+
+            {% for s in statuses %}
+              <option value="{{ s }}" {% if selected_status == s %}selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+          </select>
+
+          <button class="btn btn-primary" type="submit">Apply</button>
+
+          {% if (selected_status|string)|lower != "all" %}
+            <a class="btn btn-accent" href="/admin_dashboard?status=all">Clear</a>
+          {% endif %}
+        </form>
       </div>
 
       <div class="actions">
         <a href="/admin_add_flight" class="btn btn-accent">+ Add New Flight</a>
+        <a href="/admin_add_plane" class="btn btn-accent">+ Add New Plane</a>
+        <a href="/admin_add_crew" class="btn btn-accent">+ Add New Crew Member</a>
         <a href="/admin_logout" class="btn btn-danger">Logout</a>
       </div>
     </div>

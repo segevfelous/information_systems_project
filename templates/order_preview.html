@@ -185,6 +185,41 @@
       .grid{ grid-template-columns: 1fr; }
       .card{ padding:20px; }
     }
+    .grid .full{ grid-column: 1 / -1; }
+
+    #phones-container{
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+      margin-top:8px;
+      margin-bottom:12px;
+    }
+
+    .phone-input{
+      width:100%;
+      max-width:420px;
+      padding:12px 14px;
+      border-radius:12px;
+      border:1px solid #E6EBF3;
+      font-size:14px;
+      box-sizing:border-box;
+    }
+
+    .add-phone-btn{
+      max-width:420px;
+      padding:12px 14px;
+      border-radius:14px;
+      border:1px dashed rgba(201,182,255,.7);
+      background:white;
+      color:#0E1D2D;
+      font-weight:bold;
+      cursor:pointer;
+    }
+
+    .add-phone-btn:hover{
+      background:rgba(201,182,255,.18);
+    }
+
   </style>
 </head>
 
@@ -241,8 +276,23 @@
             <input name="lname" placeholder="Last name" required>
           </div>
           <div>
-            <label>Phone_number</label>
-            <input name="phone_number" placeholder="Phone_number" required>
+          <div class="full">
+            <label>Phone Numbers</label>
+
+            <div id="phones-container">
+              <input
+                type="text"
+                name="phone"
+                placeholder="Phone number (Required)"
+                required
+                class="phone-input"
+              />
+            </div>
+
+            <button type="button" id="add-phone-btn" class="add-phone-btn">
+              + Add another phone
+            </button>
+          </div>
           </div>
         </div>
       {% endif %}
@@ -255,5 +305,23 @@
 
   </div>
 </div>
+<script>
+  (function () {
+    const container = document.getElementById("phones-container");
+    const addBtn = document.getElementById("add-phone-btn");
+
+    if (!container || !addBtn) return; // אם need_unreg_details לא מוצג
+
+    addBtn.addEventListener("click", function () {
+      const input = document.createElement("input");
+      input.type = "text";
+      input.name = "phone";
+      input.placeholder = "Phone number (Required)";
+      input.className = "phone-input";
+      container.appendChild(input);
+    });
+  })();
+</script>
+
 </body>
 </html>

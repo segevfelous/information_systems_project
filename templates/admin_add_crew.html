@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Add Crew Member</title>
+
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+  <style>
+    body{
+      margin:0;
+      font-family: Arial, Helvetica, sans-serif;
+      background:#F6F8FC;
+      color:#0E1D2D;
+    }
+    .page{
+      width: 100%;
+      max-width: 980px;
+      margin: 40px auto;
+      padding: 0 32px;
+    }
+    .card{
+      background:#fff;
+      border-radius:22px;
+      padding:26px;
+      box-shadow:0 14px 36px rgba(14,29,45,0.12);
+      border:1px solid #E6EBF3;
+    }
+    .topbar{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:16px;
+      margin-bottom:18px;
+      flex-wrap:wrap;
+    }
+    h1{
+      margin:0;
+      font-size:24px;
+    }
+    .muted{
+      color:#546275;
+      font-size:14px;
+    }
+    .btn{
+      padding:10px 14px;
+      border-radius:14px;
+      font-weight:bold;
+      cursor:pointer;
+      border:1px solid transparent;
+      text-decoration:none;
+      display:inline-block;
+      text-align:center;
+    }
+    .btn-primary{
+      background:#4A7A87;
+      color:white;
+    }
+    .btn-primary:hover{
+      background:#2E4D5C;
+    }
+    .btn-accent{
+      background:rgba(201,182,255,.4);
+      color:#0E1D2D;
+      border-color:rgba(201,182,255,.7);
+    }
+    .btn-accent:hover{
+      background:rgba(191,167,255,.55);
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:14px;
+      margin-top:14px;
+    }
+    label{
+      font-size:13px;
+      color:#546275;
+      display:block;
+      margin-bottom:6px;
+      font-weight:bold;
+    }
+    input, select{
+      width:100%;
+      padding:11px 12px;
+      border-radius:14px;
+      border:1px solid #E6EBF3;
+      background:#fff;
+      outline:none;
+      font-size:14px;
+      box-sizing:border-box;
+    }
+    input:focus, select:focus{
+      border-color: rgba(74,122,135,.65);
+      box-shadow: 0 0 0 4px rgba(74,122,135,.12);
+    }
+
+    .row-actions{
+      display:flex;
+      gap:10px;
+      margin-top:18px;
+      flex-wrap:wrap;
+    }
+
+    .error{
+      margin-top:10px;
+      color:#b00020;
+      font-weight:bold;
+    }
+    .success{
+      margin-top:10px;
+      color:#0b6b3a;
+      font-weight:bold;
+    }
+
+    @media(max-width:760px){
+      .grid{ grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="page">
+    <div class="card">
+
+      <div class="topbar">
+        <div>
+          <h1>Add Crew Member</h1>
+          <div class="muted">Pilot or Flight Attendant</div>
+        </div>
+        <a class="btn btn-accent" href="/admin_dashboard">← Back to Dashboard</a>
+      </div>
+
+      {% if error %}
+        <div class="error">{{ error }}</div>
+      {% endif %}
+      {% if success %}
+        <div class="success">{{ success }}</div>
+      {% endif %}
+
+      <form method="POST" action="/admin_add_crew">
+        <div class="grid">
+
+          <div>
+            <label>Role</label>
+            <select name="role" required>
+              <option value="" selected disabled>Choose...</option>
+              <option value="pilot">Pilot</option>
+              <option value="flight_attendant">Flight Attendant</option>
+            </select>
+          </div>
+
+          <div>
+            <label>ID</label>
+            <input type="number" name="id" required >
+          </div>
+
+          <div>
+            <label>First Name </label>
+            <input type="text" name="fname" required >
+          </div>
+
+          <div>
+            <label>Last Name </label>
+            <input type="text" name="lname" required >
+          </div>
+
+          <div>
+            <label>Start Date</label>
+            <input type="date" name="start_date" required>
+          </div>
+
+          <div>
+            <label>Training</label>
+            <select name="training" required>
+              <option value="" selected disabled>Choose...</option>
+              <option value="short">short</option>
+              <option value="long">long</option>
+            </select>
+          </div>
+
+          <div>
+            <label>City</label>
+            <input type="text" name="city" required >
+          </div>
+
+          <div>
+            <label>Street</label>
+            <input type="text" name="street" required>
+          </div>
+
+          <div>
+            <label>House Number</label>
+            <input type="number" name="house_number" required>
+          </div>
+
+          <div>
+            <label>Phone</label>
+            <input type="text" name="phone" required >
+          </div>
+
+        </div>
+
+        <div class="row-actions">
+          <button class="btn btn-primary" type="submit">Save Crew Member</button>
+          <a class="btn btn-accent" href="/admin_dashboard">Cancel</a>
+        </div>
+      </form>
+
+    </div>
+  </div>
+</body>
+</html>

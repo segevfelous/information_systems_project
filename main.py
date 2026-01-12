@@ -6,12 +6,10 @@ import string
 import re
 import random
 from utilities import (
-    validate_long_flight_plane_size,
-    fetch_flight,
-    can_assign_staff,
-    can_use_plane,
-    lock_total_price_at_booking_time,
+  fetch_route_duration_hours, can_use_plane, can_assign_staff,
+  fetch_plane_size, required_crew_by_plane_size, validate_long_flight_plane_size,fetch_airports_from_flight_duration
 )
+
 
 
 
@@ -21,8 +19,8 @@ app = Flask(__name__)
 
 app.config.update(
     SESSION_TYPE="filesystem",
-    # SESSION_FILE_DIR="flask_session_data",   # if using local
-    SESSION_FILE_DIR="/home/segev/information_systems_project/flask_session_data",   # if using pythonanywhere
+    SESSION_FILE_DIR="flask_session_data",   # if using local
+    # SESSION_FILE_DIR="/home/segev/information_systems_project/flask_session_data",   # if using pythonanywhere
     SESSION_PERMANENT=True,
     PERMANENT_SESSION_LIFETIME=timedelta(minutes=10),
     SESSION_REFRESH_EACH_REQUEST=True,
@@ -34,16 +32,16 @@ Session(app)
 mydb = mysql.connector.connect(
 
     #### if using local ####
-    # host="localhost",
-    # user="root",
-    # password="root",
-    # database="flytau",
+    host="localhost",
+    user="root",
+    password="root",
+    database="flytau",
 
     #### if using pythonanywhere ####
-    host= "segev.mysql.pythonanywhere-services.com",
-    user="segev",
-    password="Amit1111",
-    database="segev$flytau_DB",
+    # host= "segev.mysql.pythonanywhere-services.com",
+    # user="segev",
+    # password="Amit1111",
+    # database="segev$flytau_DB",
 
     #### General ####
     autocommit=True
@@ -581,7 +579,7 @@ def order_confirm():
     # אם צריך ליצור unregistered_customer — נקבל פרטים מהטופס
     fname = request.form.get("fname", "").strip()
     lname = request.form.get("lname", "").strip()
-    phone_number = request.form.get("phone_number", "").strip()
+    phones = request.form.getlist("phone")
 
     ensure_mydb_is_connected()
     cur = mydb.cursor(dictionary=True)
@@ -665,6 +663,75 @@ def order_success():
 
 @app.route("/my_booking", methods=["GET"])
 def my_bookings():
+    booking_code = (request.args.get("booking_code") or "").strip()
+
+    # ----- חיפוש לפי קוד הזמנה -----
+    if booking_code:
+        if not booking_code.isdigit():
+            return render_template(
+                "my_booking.html",
+                email="",
+                upcoming=[],
+                history=[],
+                single_booking=None,
+                message="Booking code must be a number."
+            )
+
+        ensure_mydb_is_connected()
+        cur = mydb.cursor(dictionary=True)
+
+        cur.execute("""
+            SELECT
+                b.booking_code,
+                b.email,
+                b.status,
+                b.total_price,
+                f.Flight_Date,
+                f.Departure_Time,
+                f.Landing_Time,
+                f.Departure_Airport,
+                f.Destination_Airport,
+                GROUP_CONCAT(CONCAT(t.`row`, CHAR(64 + t.`col`)) ORDER BY t.`row`, t.`col` SEPARATOR ', ') AS seats
+            FROM bookings b
+            JOIN tickets t
+              ON t.booking_code = b.booking_code
+            JOIN flights f
+              ON f.Flight_Date = t.flight_date
+             AND f.Departure_Time = t.departure_time
+            WHERE b.booking_code = %s
+            GROUP BY
+                b.booking_code, b.email, b.status, b.total_price,
+                f.Flight_Date, f.Departure_Time, f.Landing_Time,
+                f.Departure_Airport, f.Destination_Airport
+            LIMIT 1
+        """, (int(booking_code),))
+
+        one = cur.fetchone()
+        cur.close()
+
+        if not one:
+            return render_template(
+                "my_booking.html",
+                email="",
+                upcoming=[],
+                history=[],
+                single_booking=None,
+                message="Booking code not found."
+            )
+
+        seat = one.get("seats", "")
+        if isinstance(seat, (bytes, bytearray)):
+            seat = seat.decode("utf-8", errors="ignore")
+        one["seats"] = seat
+
+        return render_template(
+            "my_booking.html",
+            email="",
+            upcoming=[],
+            history=[],
+            single_booking=one,
+            message=""
+        )
 
     email = session.get("username") or session.get("guest_email") or (request.args.get("email") or "").strip()
 
@@ -740,9 +807,9 @@ def my_bookings():
         email=email,
         upcoming=upcoming,
         history=history,
+        single_booking=None,
         message=""
     )
-
 @app.route("/booking/cancel", methods=["POST"])
 def booking_cancel():
     booking_code = (request.form.get("booking_code") or "").strip()
@@ -887,20 +954,35 @@ def admin_logout():
     return redirect("/admin_login")
 
 
+from flask import request, render_template, redirect, session
+from datetime import datetime, date, time
+
 @app.route("/admin_dashboard")
 def admin_dashboard():
-    if session.get("role") != "admin":   # ✅ החלפה כאן
+    if session.get("role") != "admin":
         return redirect("/admin_login")
+
+    # ✅ status filter (GET param)
+    selected_status = (request.args.get("status", "all") or "all").strip()
 
     ensure_mydb_is_connected()
     cur = mydb.cursor(dictionary=True)
 
-    cur.execute("""
+    # ✅ בונים SQL דינמי + פרמטרים
+    sql = """
         SELECT Flight_Date, Departure_Time, Landing_Time,
                Departure_Airport, Destination_Airport, Plane_ID, status
         FROM flights
-        ORDER BY Flight_Date DESC, Departure_Time DESC
-    """)
+    """
+    params = []
+
+    if selected_status.lower() != "all":
+        sql += " WHERE status = %s "
+        params.append(selected_status)
+
+    sql += " ORDER BY Flight_Date DESC, Departure_Time DESC "
+
+    cur.execute(sql, params)
     flights_rows = cur.fetchall()
     cur.close()
 
@@ -933,58 +1015,20 @@ def admin_dashboard():
         f["hours_left"] = round(hours_left, 1)
         flights_view.append(f)
 
+    # ✅ אם בא לך שה-dropdown יציג רק סטטוסים שקיימים בפועל:
+    # (אפשר גם להחליף לרשימה קבועה אם יש לכם סטטוסים ידועים)
+    cur2 = mydb.cursor()
+    cur2.execute("SELECT DISTINCT status FROM flights ORDER BY status")
+    statuses = [row[0] for row in cur2.fetchall() if row[0] is not None and str(row[0]).strip() != ""]
+    cur2.close()
+
     return render_template(
         "admin_dashboard.html",
         admin_name=session.get("admin_name", "Admin"),
-        flights=flights_view
+        flights=flights_view,
+        statuses=statuses,
+        selected_status=selected_status
     )
-
-@app.route("/admin_add_flight", methods=["GET", "POST"])
-def admin_add_flight():
-    ensure_mydb_is_connected()
-    if not session.get("admin_id"):
-        return redirect("/admin_login")
-
-    if request.method == "GET":
-        return render_template("admin_add_flight.html", message="")
-
-    # ---------- קלט ----------
-    flight_date = (request.form.get("flight_date") or "").strip()
-    departure_time = (request.form.get("departure_time") or "").strip()
-    landing_time = (request.form.get("landing_time") or "").strip() or None
-    plane_id = (request.form.get("plane_id") or "").strip()
-    dep_airport = (request.form.get("departure_airport") or "").strip().upper()
-    dest_airport = (request.form.get("destination_airport") or "").strip().upper()
-
-    # ---------- ולידציה בסיסית ----------
-    if not (flight_date and departure_time and plane_id and dep_airport and dest_airport):
-        return render_template("admin_add_flight.html", message="Missing required fields")
-
-    if not plane_id.isdigit():
-        return render_template("admin_add_flight.html", message="Plane ID must be numeric")
-
-    # נרמול שעה
-    if len(departure_time) == 5:
-        departure_time += ":00"
-    if landing_time and len(landing_time) == 5:
-        landing_time += ":00"
-
-    # ---------- הלוגיקה האמיתית ----------
-    ok, msg = add_flight_with_rules(
-        mydb,
-        flight_date,
-        departure_time,
-        int(plane_id),
-        landing_time,
-        dep_airport,
-        dest_airport,
-        status="active"
-    )
-
-    if not ok:
-        return render_template("admin_add_flight.html", message=msg)
-
-    return redirect("/admin_dashboard")
 
 
 def add_flight_with_rules(mydb, flight_date, departure_time, plane_id, landing_time, dep_airport, dest_airport, status="active"):
@@ -1160,8 +1204,546 @@ def admin_cancel_flight():
         mydb.rollback()
         cur.close()
         return f"Cancel failed: {e}", 400
+def insert_plane_to_db(plane_id, manufacturer, size, purchase_date):
+    """
+    מכניס מטוס לטבלה plane.
+    אם plane_id ריק/None -> מכניס בלי ID (רק אם בעמודה ID מוגדר AUTO_INCREMENT).
+    """
+    manufacturer = (manufacturer or "").strip()
+    size = (size or "").strip()
+    purchase_date = (purchase_date or "").strip()
+
+    if not manufacturer or not size or not purchase_date:
+        raise ValueError("Missing required plane fields.")
+
+    cursor = mydb.cursor()
+
+    # אם המשתמש נתן ID — נכניס עם ID
+    if plane_id is not None and str(plane_id).strip() != "":
+        sql = """
+            INSERT INTO plane (ID, Manufacturer, Size, Purchase_Date)
+            VALUES (%s, %s, %s, %s)
+        """
+        params = (int(plane_id), manufacturer, size, purchase_date)
+    else:
+        # בלי ID (מתאים רק אם ID הוא AUTO_INCREMENT)
+        sql = """
+            INSERT INTO plane (Manufacturer, Size, Purchase_Date)
+            VALUES (%s, %s, %s)
+        """
+        params = (manufacturer, size, purchase_date)
+
+    cursor.execute(sql, params)
+    cursor.close()
 
 
+@app.route("/admin_add_plane", methods=["GET", "POST"])
+def admin_add_plane():
+    if request.method == "POST":
+        plane_id = request.form.get("plane_id", "").strip()
+        manufacturer = request.form.get("manufacturer", "").strip()
+        size = request.form.get("size", "").strip()
+        purchase_date = request.form.get("purchase_date", "").strip()  # YYYY-MM-DD
 
-# if __name__ == "__main__": # uncomment if using local, comment if using pythonanywhere.
-    # app.run(debug=True)
+        try:
+            # אם השדה ריק נשאיר None
+            plane_id_val = plane_id if plane_id != "" else None
+
+            insert_plane_to_db(
+                plane_id=plane_id_val,
+                manufacturer=manufacturer,
+                size=size,
+                purchase_date=purchase_date
+            )
+
+            return render_template("admin_add_plane.html", success="Plane added successfully!")
+        except mysql.connector.Error as e:
+            # למשל Duplicate entry על ID
+            return render_template("admin_add_plane.html", error=f"Database error: {e}")
+        except ValueError as e:
+            return render_template("admin_add_plane.html", error=str(e))
+
+    return render_template("admin_add_plane.html")
+ALLOWED_ROLES = {"pilot", "flight_attendant"}
+ALLOWED_TRAINING = {"short", "long"}
+
+def insert_crew_member_to_db(role, crew_id, fname, lname, start_date, city, street, house_number, phone, training):
+    """
+    מכניס איש צוות לטבלה:
+    - role='pilot' -> pilot
+    - role='flight_attendant' -> flight_attendant
+    עמודות לפי התמונות: ID, fname, lname, start_date, city, street, house_number, phone, training
+    """
+    role = (role or "").strip()
+    if role not in ALLOWED_ROLES:
+        raise ValueError("Role must be pilot or flight_attendant.")
+
+    training = (training or "").strip()
+    if training not in ALLOWED_TRAINING:
+        raise ValueError("Training must be short or long.")
+
+    # basic clean
+    fname = (fname or "").strip()
+    lname = (lname or "").strip()
+    start_date = (start_date or "").strip()  # YYYY-MM-DD
+    city = (city or "").strip()
+    street = (street or "").strip()
+    phone = (phone or "").strip()
+
+    if not all([crew_id, fname, lname, start_date, city, street, house_number, phone, training]):
+        raise ValueError("Please fill in all fields.")
+
+    table_name = "pilot" if role == "pilot" else "flight_attendant"
+
+    sql = f"""
+        INSERT INTO {table_name}
+            (ID, fname, lname, start_date, city, street, house_number, phone, training)
+        VALUES
+            (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+    """
+
+    params = (
+        int(crew_id),
+        fname,
+        lname,
+        start_date,
+        city,
+        street,
+        int(house_number),
+        phone,
+        training
+    )
+
+    cursor = mydb.cursor()
+    cursor.execute(sql, params)
+    cursor.close()
+
+
+@app.route("/admin_add_crew", methods=["GET", "POST"])
+def admin_add_crew():
+    if request.method == "POST":
+        role = request.form.get("role", "").strip()
+        crew_id = request.form.get("id", "").strip()
+        fname = request.form.get("fname", "").strip()
+        lname = request.form.get("lname", "").strip()
+        start_date = request.form.get("start_date", "").strip()
+        city = request.form.get("city", "").strip()
+        street = request.form.get("street", "").strip()
+        house_number = request.form.get("house_number", "").strip()
+        phone = request.form.get("phone", "").strip()
+        training = request.form.get("training", "").strip()
+
+        try:
+            insert_crew_member_to_db(
+                role=role,
+                crew_id=crew_id,
+                fname=fname,
+                lname=lname,
+                start_date=start_date,
+                city=city,
+                street=street,
+                house_number=house_number,
+                phone=phone,
+                training=training
+            )
+            return render_template("admin_add_crew.html", success="Crew member added successfully!")
+        except mysql.connector.Error as e:
+            # למשל Duplicate entry על ID
+            return render_template("admin_add_crew.html", error=f"Database error: {e}")
+        except ValueError as e:
+            return render_template("admin_add_crew.html", error=str(e))
+
+    return render_template("admin_add_crew.html")
+
+
+def _normalize_date(d):
+    if isinstance(d, date):
+        return d
+    return datetime.strptime(str(d)[:10], "%Y-%m-%d").date()
+
+def _normalize_time(t):
+    if isinstance(t, time):
+        return t
+    s = str(t).split(".")[0]
+    # יכול להגיע HH:MM
+    if len(s) == 5:
+        s += ":00"
+    return datetime.strptime(s, "%H:%M:%S").time()
+
+def _compute_landing_time(cur, dep_airport, dest_airport, flight_date, departure_time):
+    """
+    Landing_Time מחושב לפי Flight_Duration:
+    landing_dt = dep_dt + duration_hours
+    נשמור רק את ה-time לטבלת Flights.
+    """
+    dur = fetch_route_duration_hours(cur, dep_airport, dest_airport)
+    if dur is None:
+        raise ValueError("Missing route in Flight_Duration for this route.")
+
+    dep_dt = datetime.combine(flight_date, departure_time)
+    land_dt = dep_dt + timedelta(hours=float(dur))
+    return land_dt.time()
+
+def _build_flight_row_for_checks(flight_date, departure_time, landing_time, dep_airport, dest_airport, plane_id):
+    return {
+        "flight_date": flight_date,
+        "departure_time": departure_time,
+        "landing_time": landing_time,
+        "dep_airport": dep_airport,
+        "dest_airport": dest_airport,
+        "plane_id": int(plane_id),
+        "status": "active"
+    }
+
+def _fetch_available_resources(cur, flight_date, departure_time, dep_airport, dest_airport):
+    """
+    מחזיר:
+      landing_time (מחושב),
+      available_planes: list[int],
+      available_pilots: list[dict{id,fname,lname}],
+      available_attendants: list[dict{id,fname,lname}]
+    """
+    landing_time = _compute_landing_time(cur, dep_airport, dest_airport, flight_date, departure_time)
+
+    # ---- PLANES ----
+    cur.execute("SELECT `ID` AS id FROM `Plane`")
+    plane_ids = [r["id"] for r in (cur.fetchall() or [])]
+
+    available_planes = []
+    for pid in plane_ids:
+        flight_row = _build_flight_row_for_checks(flight_date, departure_time, landing_time, dep_airport, dest_airport, pid)
+
+        ok, _msg = can_use_plane(cur, flight_row, pid)
+        if not ok:
+            continue
+
+        # כלל: טיסה ארוכה => BIG plane
+        try:
+            validate_long_flight_plane_size(cur, flight_row)
+        except Exception:
+            continue
+
+        available_planes.append(int(pid))
+
+    # ---- PILOTS ----
+    cur.execute("SELECT `ID` AS id, `fname` AS fname, `lname` AS lname FROM `Pilot`")
+    pilots = cur.fetchall() or []
+    available_pilots = []
+    for p in pilots:
+        # שים plane_id זמני (לא משפיע על בדיקות staff) — נשתמש ב-1 אם אין
+        temp_plane = available_planes[0] if available_planes else 1
+        flight_row = _build_flight_row_for_checks(flight_date, departure_time, landing_time, dep_airport, dest_airport, temp_plane)
+
+        ok, _msg = can_assign_staff(cur, flight_row, int(p["id"]))
+        if ok:
+            available_pilots.append({"id": int(p["id"]), "fname": p["fname"], "lname": p["lname"]})
+
+    # ---- ATTENDANTS ----
+    cur.execute("SELECT `ID` AS id, `fname` AS fname, `lname` AS lname FROM `Flight_Attendant`")
+    attendants = cur.fetchall() or []
+    available_attendants = []
+    for a in attendants:
+        temp_plane = available_planes[0] if available_planes else 1
+        flight_row = _build_flight_row_for_checks(flight_date, departure_time, landing_time, dep_airport, dest_airport, temp_plane)
+
+        ok, _msg = can_assign_staff(cur, flight_row, int(a["id"]))
+        if ok:
+            available_attendants.append({"id": int(a["id"]), "fname": a["fname"], "lname": a["lname"]})
+
+    return landing_time, available_planes, available_pilots, available_attendants
+
+
+@app.route("/admin_add_flight", methods=["GET", "POST"])
+def admin_add_flight():
+    if session.get("role") != "admin":
+        return redirect("/admin_login")
+
+    ensure_mydb_is_connected()
+    cur = mydb.cursor(dictionary=True)
+
+    # ---------- GET ----------
+    if request.method == "GET":
+        airports = fetch_airports_from_flight_duration(cur)
+        cur.close()
+        return render_template("admin_add_flight.html", airports=airports)
+
+    step = (request.form.get("step", "1") or "1").strip()
+
+    # =========================================================
+    # STEP 1: date/time/route (לא לשנות)
+    # =========================================================
+    if step == "1":
+        try:
+            flight_date = _normalize_date(request.form.get("flight_date", "").strip())
+            departure_time = _normalize_time(request.form.get("departure_time", "").strip())
+            dep_airport = request.form.get("departure_airport", "").strip().upper()
+            dest_airport = request.form.get("destination_airport", "").strip().upper()
+
+            landing_time, available_planes, available_pilots, available_attendants = _fetch_available_resources(
+                cur, flight_date, departure_time, dep_airport, dest_airport
+            )
+
+            # ✅ מינימום צוות לפני בחירת מטוס (טיסה קצרה): 2 טייסים + 3 דיילים
+            MIN_PILOTS = 2
+            MIN_ATT = 3
+
+            missing = []
+            if len(available_pilots) < MIN_PILOTS:
+                missing.append("אין מספיק טייסים")
+            if len(available_attendants) < MIN_ATT:
+                missing.append("אין מספיק דיילים")
+
+            if missing:
+                msg = (
+                    f"{' ו'.join(missing)} בתאריך/שעה/שדה שבחרת. "
+                    "חזור לdashboard."
+                )
+
+                airports = fetch_airports_from_flight_duration(cur)
+                cur.close()
+                return render_template(
+                    "admin_add_flight.html",
+                    step=1,
+                    error=msg,
+                    airports=airports,
+                    selected_flight_date=str(flight_date),
+                    selected_departure_time=departure_time.strftime("%H:%M"),
+                    selected_dep_airport=dep_airport,
+                    selected_dest_airport=dest_airport,
+                    show_back_only=True
+                )
+
+            # אם יש מינימום צוות — ממשיכים ל-Step 2
+            cur.close()
+            return render_template(
+                "admin_add_flight.html",
+                step=2,
+                flight_date=str(flight_date),
+                departure_time=departure_time.strftime("%H:%M"),
+                departure_airport=dep_airport,
+                destination_airport=dest_airport,
+                landing_time=landing_time.strftime("%H:%M") if landing_time else None,
+                available_planes=available_planes
+            )
+
+        except Exception as e:
+            airports = fetch_airports_from_flight_duration(cur)
+            cur.close()
+            return render_template(
+                "admin_add_flight.html",
+                step=1,
+                error=str(e),
+                airports=airports,
+                show_back_only=True
+            )
+
+    # =========================================================
+    # STEP 2: choose plane only -> then proceed to step 3
+    # =========================================================
+    if step == "2":
+        try:
+            flight_date = _normalize_date(request.form.get("flight_date", "").strip())
+            departure_time = _normalize_time(request.form.get("departure_time", "").strip())
+            dep_airport = request.form.get("departure_airport", "").strip().upper()
+            dest_airport = request.form.get("destination_airport", "").strip().upper()
+            plane_id = (request.form.get("plane_id", "") or "").strip()
+
+            landing_time, available_planes, _, _ = _fetch_available_resources(
+                cur, flight_date, departure_time, dep_airport, dest_airport
+            )
+
+            if not plane_id:
+                html = render_template(
+                    "admin_add_flight.html",
+                    step=2,
+                    error="Please choose a plane.",
+                    flight_date=str(flight_date),
+                    departure_time=departure_time.strftime("%H:%M"),
+                    departure_airport=dep_airport,
+                    destination_airport=dest_airport,
+                    landing_time=landing_time.strftime("%H:%M"),
+                    available_planes=available_planes,
+                    selected_plane_id=""
+                )
+                cur.close()
+                return html
+
+            if int(plane_id) not in set(available_planes):
+                html = render_template(
+                    "admin_add_flight.html",
+                    step=2,
+                    error="Selected plane is not available for this flight.",
+                    flight_date=str(flight_date),
+                    departure_time=departure_time.strftime("%H:%M"),
+                    departure_airport=dep_airport,
+                    destination_airport=dest_airport,
+                    landing_time=landing_time.strftime("%H:%M"),
+                    available_planes=available_planes,
+                    selected_plane_id=plane_id
+                )
+                cur.close()
+                return html
+
+            plane_size = fetch_plane_size(cur, int(plane_id))
+            if not plane_size:
+                raise ValueError("Plane not found.")
+
+            req = required_crew_by_plane_size(plane_size)
+            req_pilots = req["pilots"]
+            req_attendants = req["attendants"]
+
+            # עכשיו מביאים רשימות צוות זמינות (תלויות בזמן+מיקום)
+            _, _, available_pilots, available_attendants = _fetch_available_resources(
+                cur, flight_date, departure_time, dep_airport, dest_airport
+            )
+
+            req_text = f"Plane {plane_id} is {plane_size}. You must select exactly {req_pilots} pilots and {req_attendants} attendants."
+
+            html = render_template(
+                "admin_add_flight.html",
+                step=3,
+                flight_date=str(flight_date),
+                departure_time=departure_time.strftime("%H:%M"),
+                departure_airport=dep_airport,
+                destination_airport=dest_airport,
+                landing_time=landing_time.strftime("%H:%M"),
+                selected_plane_id=plane_id,
+                req_pilots=req_pilots,
+                req_attendants=req_attendants,
+                req_text=req_text,
+                available_pilots=available_pilots,
+                available_attendants=available_attendants,
+                selected_pilot_ids=[],
+                selected_attendant_ids=[]
+            )
+            cur.close()
+            return html
+
+        except Exception as e:
+            cur.close()
+            return render_template("admin_add_flight.html", error=str(e))
+
+    # =========================================================
+    # STEP 3: select crew -> create flight + staff_on_flight
+    # =========================================================
+    try:
+        flight_date = _normalize_date(request.form.get("flight_date", "").strip())
+        departure_time = _normalize_time(request.form.get("departure_time", "").strip())
+        dep_airport = request.form.get("departure_airport", "").strip().upper()
+        dest_airport = request.form.get("destination_airport", "").strip().upper()
+
+        plane_id = (request.form.get("plane_id", "") or "").strip()
+        chosen_pilots = request.form.getlist("pilot_ids")
+        chosen_attendants = request.form.getlist("attendant_ids")
+
+        # מחשבים שוב (הגנה)
+        landing_time, available_planes, available_pilots, available_attendants = _fetch_available_resources(
+            cur, flight_date, departure_time, dep_airport, dest_airport
+        )
+
+        def render_step3_error(msg):
+            req_pilots = None
+            req_attendants = None
+            req_text = ""
+
+            if plane_id and plane_id.isdigit():
+                size = fetch_plane_size(cur, int(plane_id))
+                if size:
+                    req = required_crew_by_plane_size(size)
+                    req_pilots = req["pilots"]
+                    req_attendants = req["attendants"]
+                    req_text = f"Plane {plane_id} is {size}. You must select exactly {req_pilots} pilots and {req_attendants} attendants."
+
+            html = render_template(
+                "admin_add_flight.html",
+                step=3,
+                error=msg,
+                flight_date=str(flight_date),
+                departure_time=departure_time.strftime("%H:%M"),
+                departure_airport=dep_airport,
+                destination_airport=dest_airport,
+                landing_time=landing_time.strftime("%H:%M"),
+                selected_plane_id=plane_id,
+                req_pilots=req_pilots,
+                req_attendants=req_attendants,
+                req_text=req_text,
+                available_pilots=available_pilots,
+                available_attendants=available_attendants,
+                selected_pilot_ids=[int(x) for x in chosen_pilots if str(x).isdigit()],
+                selected_attendant_ids=[int(x) for x in chosen_attendants if str(x).isdigit()]
+            )
+            return html
+
+        if not plane_id:
+            html = render_step3_error("Missing plane. Please go back and choose a plane.")
+            cur.close()
+            return html
+
+        if int(plane_id) not in set(available_planes):
+            html = render_step3_error("Selected plane is not available for this flight.")
+            cur.close()
+            return html
+
+        plane_size = fetch_plane_size(cur, int(plane_id))
+        req = required_crew_by_plane_size(plane_size)
+
+        if len(chosen_pilots) != req["pilots"]:
+            html = render_step3_error(f"You must select exactly {req['pilots']} pilots.")
+            cur.close()
+            return html
+
+        if len(chosen_attendants) != req["attendants"]:
+            html = render_step3_error(f"You must select exactly {req['attendants']} attendants.")
+            cur.close()
+            return html
+
+        avail_pilot_ids = {p["id"] for p in available_pilots}
+        avail_att_ids = {a["id"] for a in available_attendants}
+
+        for sid in chosen_pilots:
+            if int(sid) not in avail_pilot_ids:
+                html = render_step3_error("One selected pilot is not available.")
+                cur.close()
+                return html
+
+        for sid in chosen_attendants:
+            if int(sid) not in avail_att_ids:
+                html = render_step3_error("One selected attendant is not available.")
+                cur.close()
+                return html
+
+        flight_row = _build_flight_row_for_checks(
+            flight_date, departure_time, landing_time, dep_airport, dest_airport, int(plane_id)
+        )
+        validate_long_flight_plane_size(cur, flight_row)
+
+        # INSERT Flights
+        cur.execute("""
+            INSERT INTO `Flights`
+              (`Flight_Date`, `Departure_Time`, `Plane_ID`, `Landing_Time`,
+               `Departure_Airport`, `Destination_Airport`, `status`)
+            VALUES
+              (%s, %s, %s, %s, %s, %s, 'active')
+        """, (flight_date, departure_time, int(plane_id), landing_time, dep_airport, dest_airport))
+
+        # INSERT Staff_On_Flight  (✅ plane_id)
+        all_staff_ids = [int(x) for x in chosen_pilots] + [int(x) for x in chosen_attendants]
+        for sid in all_staff_ids:
+            cur.execute("""
+                INSERT INTO `Staff_On_Flight`
+                  (`ID`, `Flight_Date`, `Departure_Time`, `plane_id`)
+                VALUES
+                  (%s, %s, %s, %s)
+            """, (sid, flight_date, departure_time, int(plane_id)))
+
+        mydb.commit()
+        cur.close()
+        return render_template("admin_add_flight.html", success="Flight created successfully!")
+
+    except Exception as e:
+        mydb.rollback()
+        cur.close()
+        return render_template("admin_add_flight.html", error=str(e))
+
+if __name__ == "__main__": # uncomment if using local, comment if using pythonanywhere.
+    app.run(debug=True)
