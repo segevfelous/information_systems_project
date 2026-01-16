@@ -19,8 +19,8 @@ app = Flask(__name__)
 
 app.config.update(
     SESSION_TYPE="filesystem",
-    # SESSION_FILE_DIR="flask_session_data",   # if using local
-    SESSION_FILE_DIR="/home/segev/information_systems_project/flask_session_data",   # if using pythonanywhere
+    SESSION_FILE_DIR="flask_session_data",   # if using local
+    # SESSION_FILE_DIR="/home/segev/information_systems_project/flask_session_data",   # if using pythonanywhere
     SESSION_PERMANENT=True,
     PERMANENT_SESSION_LIFETIME=timedelta(minutes=10),
     SESSION_REFRESH_EACH_REQUEST=True,
@@ -32,16 +32,16 @@ Session(app)
 mydb = mysql.connector.connect(
 
     #### if using local ####
-    # host="localhost",
-    # user="root",
-    # password="root",
-    # database="flytau",
+    host="localhost",
+    user="root",
+    password="root",
+    database="flytau",
 
     #### if using pythonanywhere ####
-    host= "segev.mysql.pythonanywhere-services.com",
-    user="segev",
-    password="Amit1111",
-    database="segev$flytau_DB",
+    # host= "segev.mysql.pythonanywhere-services.com",
+    # user="segev",
+    # password="Amit1111",
+    # database="segev$flytau_DB",
 
     #### General ####
     autocommit=True
@@ -225,7 +225,7 @@ def seats():
     # 2️⃣ שליפת המחלקות לפי סדר: Business ואז Economy
     cur.execute("""
         SELECT Class_Type, Number_of_Rows, Number_of_Columns
-        FROM Classes
+        FROM classes
         WHERE Plane_ID = %s
         ORDER BY
           CASE
@@ -322,7 +322,7 @@ def order_new():
     # classes ordered Business -> Economy
     cur.execute("""
         SELECT Class_Type, Number_of_Rows, Number_of_Columns
-        FROM Classes
+        FROM classes
         WHERE Plane_ID=%s
         ORDER BY CASE
           WHEN Class_Type='Business' THEN 1
@@ -413,7 +413,7 @@ def get_class_ranges(cur, plane_id):
     ensure_mydb_is_connected()
     cur.execute("""
         SELECT Class_Type, Number_of_Rows, Number_of_Columns
-        FROM Classes
+        FROM classes
         WHERE Plane_ID=%s
         ORDER BY CASE
           WHEN Class_Type='Business' THEN 1
@@ -1745,5 +1745,5 @@ def admin_add_flight():
         cur.close()
         return render_template("admin_add_flight.html", error=str(e))
 
-# if __name__ == "__main__": # uncomment if using local, comment if using pythonanywhere.
-#     app.run(debug=True)
+if __name__ == "__main__": # uncomment if using local, comment if using pythonanywhere.
+    app.run(debug=True)
