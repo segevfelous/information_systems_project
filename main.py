@@ -19,8 +19,8 @@ app = Flask(__name__)
 
 app.config.update(
     SESSION_TYPE="filesystem",
-    SESSION_FILE_DIR="flask_session_data",   # if using local
-    # SESSION_FILE_DIR="/home/segev/information_systems_project/flask_session_data",   # if using pythonanywhere
+    # SESSION_FILE_DIR="flask_session_data",   # if using local
+    SESSION_FILE_DIR="/home/segev/information_systems_project/flask_session_data",   # if using pythonanywhere
     SESSION_PERMANENT=True,
     PERMANENT_SESSION_LIFETIME=timedelta(minutes=10),
     SESSION_REFRESH_EACH_REQUEST=True,
@@ -32,16 +32,16 @@ Session(app)
 mydb = mysql.connector.connect(
 
     #### if using local ####
-    host="localhost",
-    user="root",
-    password="root",
-    database="flytau",
+    # host="localhost",
+    # user="root",
+    # password="root",
+    # database="flytau",
 
     #### if using pythonanywhere ####
-    # host= "segev.mysql.pythonanywhere-services.com",
-    # user="segev",
-    # password="Amit1111",
-    # database="segev$flytau_DB",
+    host= "segev.mysql.pythonanywhere-services.com",
+    user="segev",
+    password="Amit1111",
+    database="segev$flytau_DB",
 
     #### General ####
     autocommit=True
@@ -1745,5 +1745,5 @@ def admin_add_flight():
         cur.close()
         return render_template("admin_add_flight.html", error=str(e))
 
-if __name__ == "__main__": # uncomment if using local, comment if using pythonanywhere.
-    app.run(debug=True)
+# if __name__ == "__main__": # uncomment if using local, comment if using pythonanywhere.
+#     app.run(debug=True)
