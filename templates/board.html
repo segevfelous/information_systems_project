@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Board of Directors</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            text-align: center;
+            font-family: 'Segoe UI', sans-serif;
+            background-color: #eef2f5; /* רקע כללי עדין */
+        }
+
+        /* עיצוב הכותרת כדי שתהיה למעלה ובמרכז */
+        .page-header {
+            padding-top: 50px;
+            padding-bottom: 30px;
+            text-align: center;
+            width: 100%;
+        }
+
+        h1 {
+            color: #003366;
+            font-size: 3rem; /* הגדלתי קצת את הכותרת */
+            margin: 0;
+            font-weight: 800;
+        }
+
+        /* הקופסה שמחזיקה את הכרטיסים */
+        .cards-container {
+            display: flex;
+            justify-content: center; /* ממקם באמצע */
+            align-items: flex-start; /* מיישר את כולם לקו העליון */
+            gap: 40px; /* רווח יפה בין הכרטיסים */
+            flex-wrap: wrap; /* מאפשר שבירת שורה אם המסך ממש קטן */
+            max-width: 1400px;
+            margin: 0 auto; /* ממקם את הקופסה כולה במרכז */
+            padding-bottom: 50px;
+        }
+
+        /* עיצוב הכרטיס */
+        .director-card {
+            background: white;
+            width: 350px; /* רוחב קבוע לכרטיס */
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1); /* צל עדין */
+            overflow: hidden;
+            transition: transform 0.3s ease;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .director-card:hover {
+            transform: translateY(-10px); /* אפקט ריחוף */
+        }
+
+        .director-card img {
+            width: 100%;
+            height: 300px; /* גובה אחיד לתמונות */
+            object-fit: cover; /* חותך את התמונה יפה שלא תימעך */
+            object-position: top; /* מתמקד בפנים (חלק עליון) */
+        }
+
+        .info {
+            padding: 25px;
+            background-color: white;
+            min-height: 80px; /* מוודא שהחלק התחתון אחיד בגודלו */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .role {
+            color: #003366;
+            font-size: 1.1rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin: 0;
+            line-height: 1.4;
+        }
+
+        .back-link {
+            display: inline-block;
+            margin: 30px 0 50px 0;
+            text-decoration: none;
+            color: #555;
+            font-size: 1rem;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+
+    {% include "_navbar.html" %}
+
+    <div class="page-header">
+        <h1>Board of Directors</h1>
+    </div>
+
+    <div class="cards-container">
+
+        <div class="director-card">
+            <img src="{{ url_for('static', filename='director1.jpeg') }}" alt="CEO">
+            <div class="info">
+                <p class="role">Chief Executive Officer (CEO)</p>
+            </div>
+        </div>
+
+        <div class="director-card">
+            <img src="{{ url_for('static', filename='director2.jpeg') }}" alt="Operations">
+            <div class="info">
+                <p class="role">Head of Flight Operations</p>
+            </div>
+        </div>
+
+        <div class="director-card">
+            <img src="{{ url_for('static', filename='director3.jpeg') }}" alt="Commercial">
+            <div class="info">
+                <p class="role">Chief Commercial Officer</p>
+            </div>
+        </div>
+
+    </div>
+
+    <a href="/" class="back-link">← Back to Home</a>
+
+</body>
+</html>

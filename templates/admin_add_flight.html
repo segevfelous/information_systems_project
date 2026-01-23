@@ -9,7 +9,7 @@
   <style>
     body{ margin:0; font-family: Arial, Helvetica, sans-serif; background:#F6F8FC; color:#0E1D2D; }
     .page{ width: 100%; max-width: 980px; margin: 40px auto; padding: 0 32px; }
-    .card{ background:#fff; border-radius:22px; padding:26px; box-shadow:0 14px 36px rgba(14,29,45,0.12); border:1px solid #E6EBF3; }
+    .card{ background:#fff;max-width: 980px; border-radius:22px; padding:26px; box-shadow:0 14px 36px rgba(14,29,45,0.12); border:1px solid #E6EBF3; }
     h1{ margin:0 0 14px; font-size:24px; }
     label{ font-size:13px; color:#546275; display:block; margin:12px 0 6px; font-weight:bold; }
     input, select{ width:100%; padding:11px 12px; border-radius:14px; border:1px solid #E6EBF3; background:#fff; outline:none; font-size:14px; box-sizing:border-box; }
@@ -24,6 +24,7 @@
     .item{ display:flex; gap:10px; align-items:center; padding:6px 4px; border-bottom:1px solid #F1F4FA; font-size:14px; }
     .item:last-child{ border-bottom:none; }
     .actions{ display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
+    .divider{ height:1px; background:#E6EBF3; margin:18px 0; }
     @media(max-width:760px){ .row{ grid-template-columns:1fr; } }
   </style>
 </head>
@@ -45,7 +46,8 @@
           <div class="row">
             <div>
               <label>Flight Date*</label>
-              <input type="date" name="flight_date" required value="{{ selected_flight_date or '' }}">                    </div>
+              <input type="date" name="flight_date" required value="{{ selected_flight_date or '' }}">
+            </div>
             <div>
               <label>Departure Time*</label>
               <input type="time" name="departure_time" required value="{{ selected_departure_time or '' }}">
@@ -62,9 +64,9 @@
                     {{ code }}
                   </option>
                 {% endfor %}
-
               </select>
             </div>
+
             <div>
               <label>Destination Airport*</label>
               <select name="destination_airport" required>
@@ -74,19 +76,17 @@
                     {{ code }}
                   </option>
                 {% endfor %}
-
               </select>
             </div>
           </div>
 
-            <div class="actions">
+          <div class="actions">
             {% if show_back_only %}
               <a class="btn btn-primary" href="/admin_dashboard">Back to Dashboard</a>
             {% else %}
               <button class="btn btn-primary" type="submit">Next: Choose Plane</button>
               <a class="btn btn-accent" href="/admin_dashboard">Back</a>
             {% endif %}
-
           </div>
         </form>
       {% endif %}
@@ -115,14 +115,14 @@
           </select>
 
           <div class="actions">
-            <button class="btn btn-primary" type="submit">Next: Choose Crew</button>
+            <button class="btn btn-primary" type="submit">Next: Choose Crew & Prices</button>
             <a class="btn btn-accent" href="/admin_add_flight">Start Over</a>
             <a class="btn btn-accent" href="/admin_dashboard">Back</a>
           </div>
         </form>
       {% endif %}
 
-      <!-- ================= STEP 3 (choose crew; requirements known) ================= -->
+      <!-- ================= STEP 3 (choose crew + prices) ================= -->
       {% if step == 3 %}
         <div class="muted">
           Selected: <b>{{ flight_date }}</b> at <b>{{ departure_time }}</b>,
@@ -170,6 +170,27 @@
                 </div>
               {% endfor %}
             {% endif %}
+          </div>
+
+          <div class="divider"></div>
+
+          <!-- ✅ Prices -->
+          <div class="row">
+            <div>
+              <label>Economy Ticket Price ($)*</label>
+              <input type="number" name="economy_price" step="0.01" min="0" required value="{{ economy_price or '' }}">
+            </div>
+
+            <div>
+              {% if show_business %}
+                <label>Business Ticket Price ($)*</label>
+                <input type="number" name="business_price" step="0.01" min="0" required value="{{ business_price or '' }}">
+              {% else %}
+                <label>Business Ticket Price ($)</label>
+                <input type="number" name="business_price" step="0.01" min="0" value="" disabled>
+                <div class="muted">Business is available only for Large planes.</div>
+              {% endif %}
+            </div>
           </div>
 
           <div class="actions">

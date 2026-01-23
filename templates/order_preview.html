@@ -1,3 +1,4 @@
+<!-- ---------- order_preview.html (FULL UPDATED per your rules) ---------- -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -30,15 +31,8 @@
       border:1px solid #E6EBF3;
     }
 
-    h1{
-      margin:0 0 10px;
-      font-size:28px;
-    }
-
-    h2{
-      margin:18px 0 10px;
-      font-size:20px;
-    }
+    h1{ margin:0 0 10px; font-size:28px; }
+    h2{ margin:18px 0 10px; font-size:20px; }
 
     .muted{
       color:#546275;
@@ -54,10 +48,7 @@
       margin-top: 14px;
     }
 
-    .meta p{
-      margin: 6px 0;
-      font-size:14px;
-    }
+    .meta p{ margin: 6px 0; font-size:14px; }
 
     table{
       width:100%;
@@ -80,9 +71,7 @@
       vertical-align:top;
     }
 
-    tr:hover{
-      background:#FAFBFE;
-    }
+    tr:hover{ background:#FAFBFE; }
 
     .total{
       display:flex;
@@ -96,9 +85,7 @@
       margin-top: 12px;
     }
 
-    .total strong{
-      font-size:18px;
-    }
+    .total strong{ font-size:18px; }
 
     .warning{
       background: rgba(201,182,255,.22);
@@ -155,24 +142,15 @@
       font-size:14px;
     }
 
-    .btn-primary{
-      background:#4A7A87;
-      color:white;
-    }
-
-    .btn-primary:hover{
-      background:#2E4D5C;
-    }
+    .btn-primary{ background:#4A7A87; color:white; }
+    .btn-primary:hover{ background:#2E4D5C; }
 
     .btn-ghost{
       background:white;
       color:#0E1D2D;
       border-color:#E6EBF3;
     }
-
-    .btn-ghost:hover{
-      background:rgba(201,182,255,.18);
-    }
+    .btn-ghost:hover{ background:rgba(201,182,255,.18); }
 
     .grid{
       display:grid;
@@ -195,6 +173,13 @@
       margin-bottom:12px;
     }
 
+    .phone-row{
+      display:flex;
+      gap:10px;
+      align-items:center;
+      flex-wrap:wrap;
+    }
+
     .phone-input{
       width:100%;
       max-width:420px;
@@ -204,6 +189,17 @@
       font-size:14px;
       box-sizing:border-box;
     }
+
+    .remove-phone-btn{
+      padding:10px 12px;
+      border-radius:12px;
+      border:1px solid #E6EBF3;
+      background:white;
+      font-weight:bold;
+      cursor:pointer;
+      color: black;
+    }
+    .remove-phone-btn:hover{ background:rgba(201,182,255,.18); }
 
     .add-phone-btn{
       max-width:420px;
@@ -215,11 +211,7 @@
       font-weight:bold;
       cursor:pointer;
     }
-
-    .add-phone-btn:hover{
-      background:rgba(201,182,255,.18);
-    }
-
+    .add-phone-btn:hover{ background:rgba(201,182,255,.18); }
   </style>
 </head>
 
@@ -227,7 +219,7 @@
 <div class="page">
   <div class="card">
 
-    <h1>order Preview</h1>
+    <h1>Order Preview</h1>
 
     <div class="meta">
       <p><b>order code:</b> {{ order_code }}</p>
@@ -262,40 +254,56 @@
     </div>
 
     <form method="POST" action="/order/confirm">
-      {% if need_unreg_details %}
-        <h2>We don’t recognize this email — please enter details</h2>
-        <div class="warning">All fields are required</div>
+      <h2>Passenger details</h2>
+      <div class="warning">All fields are required</div>
 
-        <div class="grid">
-          <div>
-            <label>First name</label>
-            <input name="fname" placeholder="First name" required>
-          </div>
-          <div>
-            <label>Last name</label>
-            <input name="lname" placeholder="Last name" required>
-          </div>
-          <div>
-          <div class="full">
-            <label>Phone Numbers</label>
-
-            <div id="phones-container">
-              <input
-                type="text"
-                name="phone"
-                placeholder="Phone number (Required)"
-                required
-                class="phone-input"
-              />
-            </div>
-
-            <button type="button" id="add-phone-btn" class="add-phone-btn">
-              + Add another phone
-            </button>
-          </div>
-          </div>
+      <div class="grid">
+        <div>
+          <label>First name</label>
+          <input name="fname" placeholder="First name" required value="{{ customer_fname or '' }}">
         </div>
-      {% endif %}
+
+        <div>
+          <label>Last name</label>
+          <input name="lname" placeholder="Last name" required value="{{ customer_lname or '' }}">
+        </div>
+
+        <div>
+          <label>Passport number</label>
+          <input name="passport_number" placeholder="Passport number" required value="{{ customer_passport_number or '' }}">
+        </div>
+
+        <div>
+          <label>Date of birth</label>
+          <input type="date" name="date_of_birth" required value="{{ customer_date_of_birth or '' }}">
+        </div>
+
+        <div class="full">
+          <label>Phone Numbers</label>
+
+          <div id="phones-container">
+            {% for p in phones %}
+              <div class="phone-row">
+                <input
+                  type="text"
+                  name="phone"
+                  placeholder="Phone number (Required)"
+                  class="phone-input"
+                  value="{{ p }}"
+                  {% if loop.first %}required{% endif %}
+                />
+                {% if not loop.first %}
+                  <button type="button" class="remove-phone-btn" onclick="this.parentElement.remove();">Remove</button>
+                {% endif %}
+              </div>
+            {% endfor %}
+          </div>
+
+          <button type="button" id="add-phone-btn" class="add-phone-btn">
+            + Add another phone
+          </button>
+        </div>
+      </div>
 
       <div class="actions">
         <button class="btn btn-primary" type="submit">Confirm order</button>
@@ -305,23 +313,38 @@
 
   </div>
 </div>
+
 <script>
   (function () {
     const container = document.getElementById("phones-container");
     const addBtn = document.getElementById("add-phone-btn");
-
-    if (!container || !addBtn) return; // אם need_unreg_details לא מוצג
+    if (!container || !addBtn) return;
 
     addBtn.addEventListener("click", function () {
+      const row = document.createElement("div");
+      row.className = "phone-row";
+
       const input = document.createElement("input");
       input.type = "text";
       input.name = "phone";
       input.placeholder = "Phone number (Required)";
       input.className = "phone-input";
-      container.appendChild(input);
+
+      const removeBtn = document.createElement("button");
+      removeBtn.type = "button";
+      removeBtn.className = "remove-phone-btn";
+      removeBtn.textContent = "Remove";
+      removeBtn.addEventListener("click", function () {
+        row.remove();
+      });
+
+      row.appendChild(input);
+      row.appendChild(removeBtn);
+      container.appendChild(row);
     });
   })();
 </script>
 
 </body>
 </html>
+

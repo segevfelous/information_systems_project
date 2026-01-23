@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Executive Report</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+  <style>
+    body{ margin:0; font-family: Arial, Helvetica, sans-serif; background:#F6F8FC; color:#0E1D2D; }
+    .page{ width:100%; max-width:none; margin:40px auto; padding:0 32px; }
+    .card{ background:#fff; max-width:none; border-radius:22px; padding:26px; box-shadow:0 14px 36px rgba(14,29,45,0.12); border:1px solid #E6EBF3; }
+    h1{ margin:0 0 8px; font-size:28px; }
+    h2{ margin:22px 0 10px; font-size:20px; }
+    .muted{ color:#546275; font-size:14px; }
+    .btn{ padding:10px 14px; border-radius:14px; font-weight:bold; cursor:pointer; border:1px solid transparent; text-decoration:none; display:inline-block; }
+    .btn-primary{ background:#4A7A87; color:white; }
+    .btn-primary:hover{ background:#2E4D5C; }
+
+    .grid{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:16px;
+      margin-top:14px;
+    }
+    @media(max-width:900px){
+      .grid{ grid-template-columns:1fr; }
+    }
+
+    .panel{
+      border:1px solid #E6EBF3;
+      border-radius:18px;
+      padding:14px;
+      background:#fff;
+    }
+
+    .chart{
+      width:100%;
+      border-radius:14px;
+      border:1px solid #E6EBF3;
+      background:#fff;
+    }
+
+    table{
+      width:100%;
+      border-collapse:collapse;
+      margin-top:12px;
+      font-size:14px;
+    }
+    th{
+      background:#F1F4FA;
+      text-align:left;
+      padding:10px;
+      border-bottom:2px solid #E6EBF3;
+    }
+    td{
+      padding:10px;
+      border-bottom:1px solid #E6EBF3;
+    }
+    tr:hover{ background:#FAFBFE; }
+
+    .top-actions{ margin-top:14px; display:flex; justify-content:flex-end; }
+
+    .kpi{
+      margin-top:10px;
+      padding:12px 14px;
+      border-radius:16px;
+      border:1px solid rgba(201,182,255,.55);
+      background:rgba(201,182,255,.18);
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+      font-size:14px;
+    }
+    .kpi b{ font-size:15px; }
+  </style>
+</head>
+
+<body>
+<div class="page">
+  <div class="card">
+    <h1>Executive Report</h1>
+    <div class="muted">Data-driven overview from the database (last 3 months)</div>
+
+    {% if top_destination %}
+      <div class="kpi">
+        <div>Most popular destination:</div>
+        <b>{{ top_destination }}</b>
+        <div class="muted">({{ top_destination_tickets }} tickets)</div>
+      </div>
+    {% endif %}
+
+    <div class="top-actions">
+      <a class="btn btn-primary" href="/admin_dashboard">Back to Dashboard</a>
+    </div>
+
+    <div class="grid">
+      <div class="panel">
+        <h2>Customer Cancellation Rate</h2>
+        <img class="chart" src="{{ url_for('static', filename=cancel_img) }}" alt="Cancellation Rate Chart">
+      </div>
+
+      <div class="panel">
+        <h2>Most Popular Destination (Pie)</h2>
+        <img class="chart" src="{{ url_for('static', filename=dest_pie_img) }}" alt="Popular Destination Pie Chart">
+      </div>
+    </div>
+    <div class="panel">
+      <h2>Revenue by Plane Group & Class</h2>
+      <img
+        src="{{ url_for('static', filename='reports/revenue_by_plane_group.png') }}"
+        alt="Revenue chart"
+        style="width:100%; border-radius:14px; border:1px solid #E6EBF3;"
+      >
+    </div>
+
+    <h2>Monthly Averages — Last 3 Months</h2>
+    {% if monthly_rows|length == 0 %}
+      <div class="muted">No data for the last 3 months.</div>
+    {% else %}
+      <table>
+        <thead>
+          <tr>
+            <th>Month</th>
+            <th># Flights</th>
+            <th># Bookings</th>
+            <th>Total Revenue</th>
+            <th>Customer Cancel Rate</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in monthly_rows %}
+          <tr>
+            <td>{{ r.MonthLabel }}</td>
+            <td>{{ r.flights_count }}</td>
+            <td>{{ r.bookings_count }}</td>
+            <td>{{ r.revenue_total }}$</td>
+            <td>{{ r.customer_cancel_rate }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% endif %}
+
+  </div>
+</div>
+</body>
+</html>

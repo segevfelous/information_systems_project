@@ -1,0 +1,37 @@
+<header class="site-header split-header">
+
+  <!-- Logo area -->
+  <div class="logo-area">
+    <a class="brand" href="/" aria-label="Home">
+      <img
+        src="{{ url_for('static', filename='logo.png') }}"
+        alt="FLYTAU Logo"
+      >
+    </a>
+  </div>
+
+  <!-- Navbar -->
+  <div class="nav-bar">
+    <div class="nav-inner">
+
+      <!-- Center links -->
+      <nav class="nav-links">
+        <a href="/flights">Flights</a>
+        <a href="/my_booking">Manage Booking</a>
+      </nav>
+
+      <!-- Right actions -->
+      <div class="nav-actions">
+        {% if session.get("username") %}
+          <a class="pill primary" href="/logout">Logout</a>
+        {% else %}
+          <a class="pill" href="/login">Login</a>
+          <a class="pill primary" href="/signup">Join Now</a>
+
+        {% endif %}
+      </div>
+
+    </div>
+  </div>
+
+</header>

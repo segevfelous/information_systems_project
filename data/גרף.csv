@@ -1,0 +1,11 @@
+Size,Manufacturer,Class_Type,revenue
+Large,Airbus,business,1840.00
+Large,Airbus,economy,915.00
+Small,Airbus,business,0.00
+Small,Airbus,economy,0.00
+Large,Boeing,business,0.00
+Large,Boeing,economy,0.00
+Small,Boeing,business,0.00
+Small,Boeing,economy,460.00
+Small,Dassault,business,0.00
+Small,Dassault,economy,100.00

@@ -1,226 +1,423 @@
-/* ===== RESET בסיסי ===== */
-* {
-  box-sizing: border-box;
+/* ==========================================================
+   FLYTAU — Single Clean Stylesheet (FIXED)
+   Goal:
+   - First screen: ONLY hero (plane image)
+   - Gallery appears ONLY after scrolling down (below hero)
+   - Premium split navbar (logo outside the bar)
+   - Clean forms/cards styling for other pages
+   ========================================================== */
+
+/* ---------- 1) Variables + Reset ---------- */
+:root{
+  --bg: #F6F8FC;
+  --text: #0E1D2D;
+  --muted: #546275;
+  --line: #E6EBF3;
+
+  --teal: #4A7A87;
+  --teal-dark: #2E4D5C;
+
+  --lilac: #C9B6FF;
+  --lilac-strong: #6F5BFF;
+
+  --shadow: 0 14px 36px rgba(14,29,45,0.12);
+  --shadow-strong: 0 22px 70px rgba(14,29,45,0.14);
 }
 
-body {
+*{ box-sizing:border-box; }
+
+body{
   margin: 0;
   font-family: Arial, Helvetica, sans-serif;
-  background: #F6F8FC;
-  color: #0E1D2D;
+  background: var(--bg);
+  color: var(--text);
 }
 
-/* ===== עיצוב כללי לכל עמוד ===== */
-body > div {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+/* Global links */
+a{
+  color: var(--teal);
+  font-weight: 900;
+  text-decoration: none;
+}
+a:hover{ text-decoration: underline; }
+
+/* ---------- 2) Generic pages (forms/cards) ---------- */
+.page{
+  min-height: calc(100vh - 84px);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding: 28px;
 }
 
-/* ===== קונטיינר מרכזי (גם אם אין class) ===== */
-body > div > div {
+.card{
   background: white;
   padding: 32px;
   width: 100%;
   max-width: 420px;
   border-radius: 20px;
-  box-shadow: 0 14px 36px rgba(14,29,45,0.12);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
 }
 
-/* ===== כותרות ===== */
-h1 {
+h1{
   text-align: center;
-  margin-top: 0;
-  color: #0E1D2D;
+  margin: 0 0 12px;
+  color: var(--text);
 }
 
-h3 {
-  margin-bottom: 8px;
-}
+h3{ margin: 14px 0 8px; }
 
-/* ===== הודעות שגיאה ===== */
-.warning {
+.warning{
   text-align: center;
-  color: #6F5BFF; /* סגול בהיר */
-  font-weight: bold;
+  color: var(--lilac-strong);
+  font-weight: 900;
 }
 
-/* ===== טפסים ===== */
-form {
-  display: flex;
-  flex-direction: column;
+form{
+  display:flex;
+  flex-direction:column;
   gap: 14px;
 }
 
-/* ===== שדות קלט – עובד גם בלי class ===== */
 input[type="text"],
 input[type="email"],
 input[type="password"],
 input[type="number"],
-input[type="date"] {
+input[type="date"]{
   padding: 12px 14px;
   border-radius: 12px;
-  border: 1px solid #E6EBF3;
+  border: 1px solid var(--line);
   font-size: 14px;
   width: 100%;
+  background: white;
 }
 
-input:focus {
+input:focus{
   outline: none;
-  border-color: #6F5BFF;
-  box-shadow: 0 0 0 3px rgba(201,182,255,0.5);
+  border-color: var(--lilac-strong);
+  box-shadow: 0 0 0 3px rgba(201,182,255,0.45);
 }
 
-/* ===== כפתורים ===== */
+/* Buttons */
 input[type="submit"],
-button {
-  padding: 12px;
+button{
+  padding: 12px 14px;
   border-radius: 14px;
   border: none;
   font-size: 15px;
-  font-weight: bold;
+  font-weight: 900;
   cursor: pointer;
-  background: #4A7A87; /* כחול-טורקיז של הלוגו */
+  background: var(--teal);
   color: white;
+  transition: transform .06s ease, background .2s ease, filter .2s ease;
 }
 
 input[type="submit"]:hover,
-button:hover {
-  background: #2E4D5C;
-}
+button:hover{ background: var(--teal-dark); }
 
-/* ===== כפתור משני (Add phone וכו') ===== */
-button {
-  background: #C9B6FF; /* סגול בהיר */
-  color: #0E1D2D;
-}
+input[type="submit"]:active,
+button:active{ transform: translateY(1px); }
 
-button:hover {
-  background: #BFA7FF;
-}
-
-/* ===== קישורים ===== */
-a {
-  display: block;
-  text-align: center;
-  margin-top: 14px;
-  color: #4A7A87;
-  text-decoration: none;
-  font-weight: bold;
-}
-
-a:hover {
-  text-decoration: underline;
-}
-
-
-/* ===== HOME (El-Al inspired) ===== */
-
-.page-wrap{
-  min-height: 100vh;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  padding: 28px;
-  background:
-    radial-gradient(900px 420px at 20% 10%,
-      rgba(74,122,135,.22) 0%,
-      rgba(201,182,255,.22) 35%,
-      rgba(246,248,252,1) 70%);
-}
-
-.home-card{
+/* ---------- 3) Premium Split Header (logo OUTSIDE bar) ---------- */
+.site-header.split-header{
+  position: sticky;
+  top: 0;
+  z-index: 999;
   width: 100%;
-  max-width: 520px;
-  background: white;
-  border: 1px solid #E6EBF3;
-  border-radius: 22px;
-  padding: 28px;
-  box-shadow: 0 14px 36px rgba(14,29,45,0.12);
-  text-align: center;
-}
-
-.logo{
-  display:block;
-  margin: 0 auto 14px;
-  max-width: 150px;
-  height:auto;
-}
-
-.title{
-  margin: 0 0 6px;
-  font-size: 30px;
-  font-weight: 900;
-  color: #0E1D2D;
-}
-
-.subtitle{
-  margin: 0 0 18px;
-  color: #546275;
-  font-weight: 700;
-}
-
-.btn-group{
-  display:flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.btn{
   display:flex;
   align-items:center;
+  background: transparent;
+}
+
+/* Logo area (left) */
+.site-header.split-header .logo-area{
+  padding: 12px 18px 12px 26px;
+  display:flex;
+  align-items:center;
+  flex: 0 0 auto;
+}
+
+.site-header.split-header .brand{
+  display:inline-flex;
+  align-items:center;
+  margin: 0;
+  padding: 0;
+  text-decoration: none;
+}
+
+.site-header.split-header .brand img{
+  height: 62px;
+  width: auto;
+  display:block;
+}
+
+/* Navbar bar (after logo) */
+.site-header.split-header .nav-bar{
+  flex: 1;
+  display:flex;
+  align-items:center;
+
+  background: rgba(255,255,255,0.78);
+  backdrop-filter: blur(14px);
+
+  border-left: 1px solid rgba(230,235,243,0.85);
+  border-bottom: 1px solid rgba(230,235,243,0.85);
+
+  border-top-left-radius: 18px;
+  border-bottom-left-radius: 18px;
+}
+
+.site-header.split-header .nav-inner{
+  width: 100%;
+  padding: 12px 26px;
+  display:flex;
+  align-items:center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.site-header.split-header a{
+  text-decoration: none;
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  color: rgba(14,29,45,0.84);
+  font-weight: 900;
+}
+
+.site-header.split-header .nav-links{
+  display:flex;
+  align-items:center;
+  gap: 22px;
+  flex-wrap: wrap;
+}
+
+.site-header.split-header .nav-links a{
+  padding: 10px 12px;
+  border-radius: 12px;
+  transition: background .2s ease, transform .05s ease;
+}
+.site-header.split-header .nav-links a:hover{
+  background: rgba(201,182,255,0.18);
+}
+.site-header.split-header .nav-links a:active{
+  transform: translateY(1px);
+}
+
+.site-header.split-header .nav-actions{
+  display:flex;
+  align-items:center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* Pills */
+.pill{
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,0.92);
+  color: var(--text);
+  font-weight: 900;
+  white-space: nowrap;
+  transition: background .2s ease, border-color .2s ease, transform .05s ease;
+}
+.pill:hover{
+  background: rgba(201,182,255,0.14);
+  border-color: rgba(201,182,255,0.55);
+}
+.pill:active{ transform: translateY(1px); }
+
+.pill.primary{
+  border: none;
+  background: linear-gradient(135deg, #2EC4C6, #26B0B2);
+  color: #fff; /* ✅ Join Now תמיד לבן */
+  box-shadow: 0 18px 34px rgba(74,122,135,.22);
+}
+
+.pill.accent{
+  border-color: rgba(201,182,255,0.70);
+  background: rgba(201,182,255,0.28);
+  color: var(--text);
+}
+
+/* ---------- 4) HOME HERO (first screen only) ---------- */
+/* IMPORTANT:
+   - hero is exactly 100vh
+   - gallery is NOT inside hero
+*/
+.hero{
+  min-height: 100vh;
+  padding: 70px 22px 54px;
+
+  background:
+    linear-gradient(90deg, rgba(14,29,45,.62) 0%, rgba(14,29,45,.22) 55%, rgba(14,29,45,.10) 100%),
+    radial-gradient(900px 420px at 16% 14%, rgba(201,182,255,.22), rgba(74,122,135,.16), rgba(246,248,252,0)),
+    var(--hero-img);
+
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+
+  border-bottom: 1px solid rgba(230,235,243,0.9);
+}
+
+.hero-inner{
+  max-width: 1220px;
+  margin: 0 auto;
+  display:flex;
   justify-content:center;
-  padding: 12px 14px;
-  border-radius: 16px;
+  align-items:flex-start;
+  padding-top: 20px;
+}
+
+.hero-left{
+  max-width: 760px;
+  margin: 0 auto;
+  text-align: center;
+  color: white;
+}
+
+.hero-left h1{
+  margin: 0 0 10px;
+  font-size: 54px;
+  font-weight: 900;
+  letter-spacing: -0.6px;
+  color: #fff;
+  text-shadow: 0 12px 30px rgba(0,0,0,0.25);
+}
+
+.hero-subtitle{
+  margin: 0 auto 20px;
+  max-width: 640px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.88);
+  text-shadow: 0 10px 26px rgba(0,0,0,0.22);
+}
+
+.hero-cta{
+  display:flex;
+  justify-content:center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.cta-btn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding: 12px 18px;
+  border-radius: 999px;
   font-weight: 900;
   text-decoration:none;
-  border: 1px solid transparent;
-  transition: transform .06s ease, background .2s ease, border-color .2s ease;
+  border: 1px solid rgba(255,255,255,0.26);
+  background: rgba(255,255,255,0.10);
+  color: rgba(255,255,255,0.92);
+  backdrop-filter: blur(10px);
+  transition: transform .06s ease, background .2s ease, border-color .2s ease, filter .2s ease;
+}
+.cta-btn:active{ transform: translateY(1px); }
+
+.cta-btn.primary{
+  border:none;
+  background: linear-gradient(135deg, var(--teal), var(--teal-dark));
+  color: #fff;
+  box-shadow: 0 18px 34px rgba(74,122,135,.22);
 }
 
-.btn:active{ transform: translateY(1px); }
-
-/* Primary (logo blue/teal) */
-.btn.primary{
-  background: #4A7A87;
-  color: white;
-  box-shadow: 0 14px 26px rgba(74,122,135,.25);
-}
-.btn.primary:hover{ background: #2E4D5C; }
-
-/* Accent (light purple) */
-.btn.accent{
-  background: rgba(201,182,255,.38);
-  color: #0E1D2D;
-  border-color: rgba(201,182,255,.70);
-}
-.btn.accent:hover{
-  background: rgba(191,167,255,.50);
+.cta-btn.ghost:hover{
+  background: rgba(201,182,255,0.16);
+  border-color: rgba(201,182,255,0.55);
 }
 
-/* Ghost (neutral but still on-brand) */
-.btn.ghost{
-  background: white;
-  color: #0E1D2D;
-  border-color: #E6EBF3;
-}
-.btn.ghost:hover{
-  background: rgba(201,182,255,.16);
-  border-color: rgba(201,182,255,.45);
+/* ---------- 5) GALLERY (appears after scroll) ---------- */
+/* This section must be placed AFTER hero in HTML */
+.mini-gallery-section{
+  padding: 22px 22px 30px;
+
+  /* like navbar glass effect */
+  background: rgba(255,255,255,0.22);
+  backdrop-filter: blur(14px);
+
+  border-top: 1px solid rgba(230,235,243,0.65);
 }
 
-/* Logout */
-.btn.danger{
-  background: #0E1D2D;
-  color: white;
-}
-.btn.danger:hover{
-  background: #081321;
+.gallery-title{
+  margin: 0 0 12px;
+  text-align: center;
+  font-size: 18px;
+  font-weight: 900;
+  color: rgba(14,29,45,0.92);
 }
 
-.divider{
-  height: 1px;
-  background: #E6EBF3;
-  margin: 18px 0;
+/* One-row horizontal scroll */
+.mini-gallery{
+  max-width: 1220px;
+  margin: 0 auto;
+
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 190px;
+  gap: 14px;
+
+  overflow-x: auto;
+  padding: 6px 4px 10px;
+  align-items: start;
+}
+
+.gallery-item{ position: relative; }
+
+.gallery-item img{
+  width: 190px;
+  height: 120px;
+  border-radius: 14px;
+  object-fit: cover;
+  box-shadow: 0 10px 24px rgba(0,0,0,0.22);
+  border: 1px solid rgba(255,255,255,0.18);
+  display:block;
+}
+
+.gallery-item span{
+  position: absolute;
+  bottom: 8px;
+  left: 10px;
+  background: rgba(14,29,45,0.70);
+  color: #fff;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+/* ---------- 6) Responsive ---------- */
+@media (max-width: 980px){
+  .site-header.split-header{
+    flex-wrap: wrap;
+  }
+  .site-header.split-header .nav-bar{
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+  }
+  .site-header.split-header .nav-inner{
+    padding: 12px 18px;
+  }
+  .hero-left h1{ font-size: 40px; }
+}
+
+@media (max-width: 520px){
+  .hero-left h1{ font-size: 34px; }
+  .site-header.split-header .brand img{ height: 54px; }
+
+  .mini-gallery{ grid-auto-columns: 160px; }
+  .gallery-item img{ width: 160px; height: 105px; }
+}
+
+/* ---------- 7) Site-wide background (all pages EXCEPT home) ---------- */
+/* Requires: body class="home" only on homepage */
+body:not(.home){
+  background:
+    linear-gradient(rgba(246,248,252,0.92), rgba(246,248,252,0.92)),
+    url("backgroundimg.png") no-repeat center center fixed;
+  background-size: cover;
 }

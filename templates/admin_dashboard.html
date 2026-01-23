@@ -169,6 +169,8 @@
 </head>
 
 <body>
+
+
 <div class="page">
   <div class="card">
 
@@ -201,6 +203,7 @@
         <a href="/admin_add_flight" class="btn btn-accent">+ Add New Flight</a>
         <a href="/admin_add_plane" class="btn btn-accent">+ Add New Plane</a>
         <a href="/admin_add_crew" class="btn btn-accent">+ Add New Crew Member</a>
+        <a href="/admin_statistics" class="btn btn-accent">Statistics</a>
         <a href="/admin_logout" class="btn btn-danger">Logout</a>
       </div>
     </div>
@@ -219,7 +222,6 @@
             <th>Route</th>
             <th>Plane</th>
             <th>Status</th>
-            <th>Hours Left</th>
             <th>Action</th>
           </tr>
         </thead>
@@ -232,7 +234,6 @@
             <td>{{ f.Departure_Airport }} → {{ f.Destination_Airport }}</td>
             <td>{{ f.Plane_ID }}</td>
             <td>{{ f.status }}</td>
-            <td>{{ f.hours_left }}</td>
             <td>
               {% if f.can_cancel %}
                 <form method="POST" action="/admin_cancel_flight">

@@ -5,10 +5,20 @@ from datetime import timedelta, datetime, date, time
 import string
 import re
 import random
+import os
+import numpy as np
+import pandas as pd
+
+import matplotlib
+matplotlib.use("Agg")
+
+import matplotlib.pyplot as plt
+from decimal import Decimal, InvalidOperation
+
 from utilities import (
-  fetch_route_duration_hours, can_use_plane, can_assign_staff,
-  fetch_plane_size, required_crew_by_plane_size, validate_long_flight_plane_size,fetch_airports_from_flight_duration
-)
+  fetch_route_duration_hours, can_use_plane, can_assign_staff,fetch_flight,lock_total_price_at_booking_time,
+  fetch_plane_size, required_crew_by_plane_size, validate_long_flight_plane_size,fetch_airports_from_flight_duration,
+_fetch_available_resources,_build_flight_row_for_checks, _compute_landing_time,_normalize_time,_normalize_date,_flight_capacity_for_plane)
 
 
 
@@ -16,11 +26,14 @@ from utilities import (
 
 
 app = Flask(__name__)
+app.config["SECRET_KEY"] = "flytau-dev-secret"
+
+
 
 app.config.update(
     SESSION_TYPE="filesystem",
-    # SESSION_FILE_DIR="flask_session_data",   # if using local
-    SESSION_FILE_DIR="/home/segev/information_systems_project/flask_session_data",   # if using pythonanywhere
+    SESSION_FILE_DIR="flask_session_data",   # if using local
+    # SESSION_FILE_DIR="/home/segev/information_systems_project/flask_session_data",   # if using pythonanywhere
     SESSION_PERMANENT=True,
     PERMANENT_SESSION_LIFETIME=timedelta(minutes=10),
     SESSION_REFRESH_EACH_REQUEST=True,
@@ -32,16 +45,16 @@ Session(app)
 mydb = mysql.connector.connect(
 
     # #### if using local ####
-    # host="localhost",
-    # user="root",
-    # password="root",
-    # database="flytau",
+    host="localhost",
+    user="root",
+    password="root",
+    database="flytau",
 
     #### if using pythonanywhere ####
-    host= "segev.mysql.pythonanywhere-services.com",
-    user="segev",
-    password="Amit1111",
-    database="segev$flytau_DB",
+    # host= "segev.mysql.pythonanywhere-services.com",
+    # user="segev",
+    # password="Amit1111",
+    # database="segev$flytau_DB",
 
     #### General ####
     autocommit=True
@@ -64,6 +77,7 @@ def session_clear():
 
 @app.route("/login", methods=["POST", "GET"])
 def login():
+
     if request.method == "POST":
         email = request.form.get("email")
         pw = request.form.get("password")
@@ -83,7 +97,7 @@ def login():
             session.clear()
             session["role"] = "user"
             session["username"] = email
-            return redirect("/")
+            return redirect("/user_home")
         else:
             return render_template("login.html", message="Incorrect password")
 
@@ -93,7 +107,7 @@ def login():
 @app.route("/logout")
 def logout():
     session.clear()      # מוחק את כל הסשן (user / admin / role)
-    return redirect("/login")
+    return render_template("homepage.html")
 
 
 @app.route("/signup", methods=["GET", "POST"])
@@ -143,43 +157,90 @@ def signup():
             cur.execute(sql_phone, (email, phone))
 
         cur.close()
-
+        session["role"] = "user"
         session["username"] = email
-        return redirect("/")
+        return redirect("/user_home")
 
     return render_template("signup.html")
+
+@app.route("/user_home")
+def user_home():
+    if session.get("role") != "user":
+        return redirect("/login")
+    return render_template("user_home.html", username=session["username"])
+
+
+def _sold_count_for_flight(cur, flight_date, departure_time):
+    cur.execute("""
+        SELECT COUNT(*) AS cnt
+        FROM tickets t
+        JOIN bookings b ON b.booking_code = t.booking_code
+        WHERE t.flight_date = %s
+          AND t.departure_time = %s
+          AND LOWER(b.status) NOT LIKE '%cancel%'
+    """, (flight_date, departure_time))
+    row = cur.fetchone()
+    return int(row["cnt"] or 0)
+
+def col_labels(n: int):
+    letters = list(string.ascii_uppercase)
+    return letters[:n]
 
 
 @app.route("/flights", methods=["GET"])
 def flights():
-    # אם אתה רוצה שרק משתמש מחובר יראה:
-
     flight_date = request.args.get("flight_date", "").strip()          # YYYY-MM-DD
     dep = request.args.get("departure_airport", "").strip().upper()    # TLV
     dest = request.args.get("destination_airport", "").strip().upper() # ATH
 
-    # בונים query דינמי לפי מה שהמשתמש מילא
+    # מציגים רק active וגם רק לא מלאות
     sql = """
-        SELECT Flight_Date, Departure_Time, Landing_Time,
-               Departure_Airport, Destination_Airport, Plane_ID, status
-        FROM flights
-        WHERE status = 'active'
+        SELECT
+            f.Flight_Date, f.Departure_Time, f.Landing_Time,
+            f.Departure_Airport, f.Destination_Airport, f.Plane_ID, f.status,
+            cap.capacity AS capacity,
+            COALESCE(sold.sold_count, 0) AS sold_count
+        FROM flights f
+
+        -- capacity לפי Plane_ID מתוך classes
+        JOIN (
+            SELECT Plane_ID, SUM(Number_of_Rows * Number_of_Columns) AS capacity
+            FROM classes
+            GROUP BY Plane_ID
+        ) cap ON cap.Plane_ID = f.Plane_ID
+
+        -- כמה נמכר בפועל לכל טיסה (לא cancelled)
+        LEFT JOIN (
+            SELECT
+                t.flight_date,
+                t.departure_time,
+                COUNT(*) AS sold_count
+            FROM tickets t
+            JOIN bookings b ON b.booking_code = t.booking_code
+            WHERE LOWER(b.status) NOT LIKE '%cancel%'
+            GROUP BY t.flight_date, t.departure_time
+        ) sold
+          ON sold.flight_date = f.Flight_Date
+         AND sold.departure_time = f.Departure_Time
+
+        WHERE f.status = 'active'
+          AND COALESCE(sold.sold_count, 0) < cap.capacity
     """
     params = []
 
     if flight_date:
-        sql += " AND Flight_Date = %s"
+        sql += " AND f.Flight_Date = %s"
         params.append(flight_date)
 
     if dep:
-        sql += " AND Departure_Airport = %s"
+        sql += " AND f.Departure_Airport = %s"
         params.append(dep)
 
     if dest:
-        sql += " AND Destination_Airport = %s"
+        sql += " AND f.Destination_Airport = %s"
         params.append(dest)
 
-    sql += " ORDER BY Flight_Date, Departure_Time"
+    sql += " ORDER BY f.Flight_Date, f.Departure_Time"
 
     ensure_mydb_is_connected()
     cur = mydb.cursor(dictionary=True)
@@ -195,34 +256,34 @@ def flights():
         destination_airport=dest
     )
 
-def col_labels(n: int):
-    # A, B, C, ... (עד 26 טורים מספיק לרוב)
-    letters = list(string.ascii_uppercase)
-    return letters[:n]
 
 @app.route("/seats")
 def seats():
     flight_date = request.args.get("flight_date")
     departure_time = request.args.get("departure_time")
 
+    if not flight_date or not departure_time:
+        return "Missing flight info", 400
+
     ensure_mydb_is_connected()
     cur = mydb.cursor(dictionary=True)
 
-    # 1️⃣ שליפת המטוס של הטיסה
+    # 1) שליפת טיסה
     cur.execute("""
         SELECT Plane_ID, Departure_Airport, Destination_Airport
         FROM flights
         WHERE Flight_Date = %s AND Departure_Time = %s
+        LIMIT 1
     """, (flight_date, departure_time))
     flight = cur.fetchone()
 
     if not flight:
         cur.close()
-        return "Flight not found"
+        return "Flight not found", 404
 
     plane_id = flight["Plane_ID"]
 
-    # 2️⃣ שליפת המחלקות לפי סדר: Business ואז Economy
+    # 2) מחלקות (Business ואז Economy)
     cur.execute("""
         SELECT Class_Type, Number_of_Rows, Number_of_Columns
         FROM classes
@@ -231,11 +292,26 @@ def seats():
           CASE
             WHEN Class_Type = 'Business' THEN 1
             WHEN Class_Type = 'Economy' THEN 2
+            ELSE 99
           END
     """, (plane_id,))
     classes = cur.fetchall()
 
-    # 3️⃣ שליפת מושבים שכבר נמכרו (עם מספור רציף!)
+    # אם אין classes בכלל — לא מאפשרים להזמין
+    if not classes:
+        cur.close()
+        return render_template(
+            "seats.html",
+            sections=[],
+            flight=flight,
+            flight_date=flight_date,
+            departure_time=departure_time,
+            message="This flight has no seating configuration."
+        )
+
+    capacity = _flight_capacity_for_plane(classes)
+
+    # 3) מושבים שנמכרו (לא cancelled)
     cur.execute("""
         SELECT t.`row`, t.`col`
         FROM tickets t
@@ -244,13 +320,30 @@ def seats():
           AND t.departure_time = %s
           AND LOWER(b.status) NOT LIKE '%cancel%'
     """, (flight_date, departure_time))
-    sold = {(r["row"], r["col"]) for r in cur.fetchall()}
+    sold_set = {(r["row"], r["col"]) for r in cur.fetchall()}
+
+    # ✅ אם הטיסה מלאה — מציגים הודעה ולא מאפשרים להמשיך
+    # (עדיין יראו את המפה כדי להבין שהיא מלאה, אבל בפועל הכל יהיה sold)
+    is_full = (len(sold_set) >= capacity)
+    if is_full:
+        # נהפוך את כל המושבים ל-"sold" כדי שלא יוכלו לבחור
+        sold_set = set()
+        offset_tmp = 0
+        for c in classes:
+            rows = int(c["Number_of_Rows"])
+            cols = int(c["Number_of_Columns"])
+            start_row = offset_tmp + 1
+            end_row = offset_tmp + rows
+            for r in range(start_row, end_row + 1):
+                for col_i in range(1, cols + 1):
+                    sold_set.add((r, col_i))
+            offset_tmp += rows
 
     cur.close()
 
-    # 4️⃣ בניית מפת מושבים — כאן קורה ה־B+1 עד B+E
+    # 4) בניית המפה עם מספור רציף
     sections = []
-    offset = 0   # כמה שורות כבר היו במטוס
+    offset = 0
 
     for c in classes:
         class_type = c["Class_Type"]
@@ -258,8 +351,8 @@ def seats():
         cols = int(c["Number_of_Columns"])
         labels = [chr(ord('A') + i) for i in range(cols)]
 
-        start_row = offset + 1        # Business: 1, Economy: B+1
-        end_row = offset + rows       # Business: B, Economy: B+E
+        start_row = offset + 1
+        end_row = offset + rows
 
         grid = []
         for r in range(start_row, end_row + 1):
@@ -269,27 +362,30 @@ def seats():
                     "row": r,
                     "col": col_i,
                     "label": labels[col_i - 1],
-                    "sold": (r, col_i) in sold
+                    "sold": (r, col_i) in sold_set
                 })
             grid.append({"row": r, "seats": row_seats})
 
         sections.append({
             "class_type": class_type,
+            "col_labels": labels,
             "grid": grid
         })
 
-        offset += rows   # ⬅️ זה מה שגורם לאקונומי להתחיל מ־B+1
+        offset += rows
 
     return render_template(
         "seats.html",
         sections=sections,
         flight=flight,
         flight_date=flight_date,
-        departure_time=departure_time
+        departure_time=departure_time,
+        message=("This flight is full. You can’t book tickets for it." if is_full else "")
     )
 
+
 def seat_to_row_col(seat_code: str):
-    m = re.match(r"^(\d+)([A-Z])$", seat_code.strip().upper())
+    m = re.match(r"^(\d+)([A-Z])$", (seat_code or "").strip().upper())
     if not m:
         return None
     row = int(m.group(1))
@@ -345,7 +441,7 @@ def order_new():
     cur.close()
 
     # build sections with continuous rows across classes
-    import string
+
     def col_labels(n): return list(string.ascii_uppercase)[:n]
 
     sections = []
@@ -439,8 +535,9 @@ def class_for_row(ranges, row):
             return rg["class"]
     return None
 
-# @app.route("/order/create", methods=["GET", "POST"])
-@app.route("/order/preview", methods=["GET","POST"])
+# ---------- Flask: /order/preview (UPDATED - unified form for ALL users + prefill) ----------
+# ---------- Flask: /order/preview (FULL UPDATED per your rules) ----------
+@app.route("/order/preview", methods=["GET", "POST"])
 def order_preview():
     flight_date = request.form.get("flight_date", "").strip()
     departure_time = request.form.get("departure_time", "").strip()
@@ -448,8 +545,10 @@ def order_preview():
 
     if not flight_date or not departure_time:
         return "Missing flight info", 400
+
+    # אם לא בחרו מושב -> חוזרים לעמוד ההושבה עם הודעה (לא 400)
     if not selected:
-        return redirect(f"/order/new?flight_date={flight_date}&departure_time={departure_time}")
+        return redirect(f"/seats?flight_date={flight_date}&departure_time={departure_time}&message=Please+select+at+least+one+seat")
 
     # מי הלקוח?
     email = session.get("username")
@@ -458,7 +557,6 @@ def order_preview():
         if not email:
             return "Missing email", 400
 
-    # אם זה אורח (לא מחובר) - נשמור אימייל כדי שיראה הזמנות בלי להקליד שוב
     if not session.get("username"):
         session["guest_email"] = email
 
@@ -488,7 +586,7 @@ def order_preview():
     plane_id = flight["Plane_ID"]
     ranges = get_class_ranges(cur, plane_id)
 
-    # בדיקת תפוסה בזמן preview (מומלץ)
+    # בדיקת תפוסה בזמן preview
     cur.execute("""
         SELECT t.`row`, t.`col`
         FROM tickets t
@@ -497,8 +595,6 @@ def order_preview():
           AND t.departure_time = %s
           AND LOWER(b.status) NOT LIKE '%cancel%'
     """, (flight_date, departure_time))
-
-
     sold_set = {(x["row"], x["col"]) for x in cur.fetchall()}
 
     for (r, c) in seats:
@@ -506,25 +602,63 @@ def order_preview():
             cur.close()
             return f"Seat already taken: {r},{c}", 400
 
-    # האם האימייל מוכר?
+    # ✅ האם רשום
     cur.execute("SELECT 1 FROM registered_customers WHERE email=%s LIMIT 1", (email,))
     is_registered = cur.fetchone() is not None
 
-    cur.execute("SELECT 1 FROM unregistered_customers WHERE email=%s LIMIT 1", (email,))
-    is_unregistered = cur.fetchone() is not None
+    # ✅ ברירת מחדל: כולם ממלאים לבד
+    customer_fname = ""
+    customer_lname = ""
+    customer_passport_number = ""
+    customer_date_of_birth = ""   # string ל-input type="date" (YYYY-MM-DD)
+    phones = [""]
 
-    need_unreg_details = (not is_registered) and (not is_unregistered)
+    # ✅ אם רשום: prefill
+    if is_registered:
+        cur.execute("""
+            SELECT fname, lname, passport, date_of_birth
+            FROM registered_customers
+            WHERE email=%s
+            LIMIT 1
+        """, (email,))
+        row = cur.fetchone() or {}
 
+        customer_fname = (row.get("fname") or "").strip()
+        customer_lname = (row.get("lname") or "").strip()
+        customer_passport_number = (row.get("passport") or "").strip()
+
+        dob = row.get("date_of_birth")
+        # dob יכול להגיע כ-date או כ-str
+        if dob is None:
+            customer_date_of_birth = ""
+        elif isinstance(dob, date):
+            customer_date_of_birth = dob.strftime("%Y-%m-%d")
+        else:
+            customer_date_of_birth = str(dob)[:10]  # "YYYY-MM-DD..."
+
+        # phones from phone_numbers(email, phone_number)
+        cur.execute("""
+            SELECT phone_number
+            FROM phone_numbers
+            WHERE email=%s
+            ORDER BY phone_number
+        """, (email,))
+        tmp = []
+        for r in cur.fetchall():
+            p = r.get("phone_number")
+            if isinstance(p, (bytes, bytearray)):
+                p = p.decode("utf-8", errors="ignore")
+            p = (p or "").strip()
+            if p:
+                tmp.append(p)
+        phones = tmp if tmp else [""]
 
     # תמחור: Business=200, Economy=100
     seat_items = []
     total_price = 0
     for (r, c) in seats:
         cls = class_for_row(ranges, r)
-        if cls == "Business":
-            price = 200
-        else:
-            price = 100
+        price = 200 if cls == "Business" else 100
         total_price += price
         seat_items.append({
             "seat": f"{r}{chr(ord('A') + c - 1)}",
@@ -534,13 +668,12 @@ def order_preview():
             "price": price
         })
 
-    # קוד הזמנה ייחודי (עדיין לא נכתב ל-DB)
+    # קוד הזמנה
     cur2 = mydb.cursor()
     booking_code = generate_booking_code(cur2)
     cur2.close()
     cur.close()
 
-    # נשמור את כל מה שצריך ל-confirm בתוך session (כדי שלא יסמכו על hidden)
     session["pending_order"] = {
         "booking_code": booking_code,
         "email": email,
@@ -552,15 +685,23 @@ def order_preview():
 
     return render_template(
         "order_preview.html",
-        booking_code=booking_code,
+        order_code=booking_code,
         email=email,
         flight=flight,
         flight_date=flight_date,
         departure_time=departure_time,
         seat_items=seat_items,
         total_price=total_price,
-        need_unreg_details=need_unreg_details
+
+        is_registered=is_registered,
+        customer_fname=customer_fname,
+        customer_lname=customer_lname,
+        customer_passport_number=customer_passport_number,
+        customer_date_of_birth=customer_date_of_birth,
+        phones=phones
     )
+
+
 @app.route("/order/confirm", methods=["POST"])
 def order_confirm():
     pending = session.get("pending_order")
@@ -569,14 +710,12 @@ def order_confirm():
 
     booking_code = pending["booking_code"]
     email = pending["email"]
-    if not session.get("username"):
-        session["guest_email"] = email
     flight_date = pending["flight_date"]
     departure_time = pending["departure_time"]
     seats = pending["seats"]
     total_price = pending["total_price"]
 
-    # אם צריך ליצור unregistered_customer — נקבל פרטים מהטופס
+    # פרטי אורח (אם צריך)
     fname = request.form.get("fname", "").strip()
     lname = request.form.get("lname", "").strip()
     phones = request.form.getlist("phone")
@@ -587,15 +726,23 @@ def order_confirm():
     try:
         mydb.start_transaction()
 
-        # האם email רשום / לא רשום?
-        cur.execute("SELECT 1 FROM registered_customers WHERE email=%s LIMIT 1", (email,))
+        # בדיקה האם הלקוח רשום
+        cur.execute(
+            "SELECT 1 FROM registered_customers WHERE email=%s LIMIT 1",
+            (email,)
+        )
         is_registered = cur.fetchone() is not None
 
-        cur.execute("SELECT 1 FROM unregistered_customers WHERE email=%s LIMIT 1", (email,))
+        # בדיקה האם אורח קיים
+        cur.execute(
+            "SELECT 1 FROM unregistered_customers WHERE email=%s LIMIT 1",
+            (email,)
+        )
         is_unregistered = cur.fetchone() is not None
 
-        if (not is_registered) and (not is_unregistered):
-            if not fname or not lname or not phone_number:
+        # אם לא רשום ולא אורח – ניצור unregistered_customer
+        if not is_registered and not is_unregistered:
+            if not fname or not lname or not phones:
                 mydb.rollback()
                 cur.close()
                 return "Missing guest details", 400
@@ -605,13 +752,15 @@ def order_confirm():
                 VALUES (%s,%s,%s)
             """, (email, fname, lname))
 
-            # נשמור טלפון
-            cur.execute("""
-                INSERT INTO Phone_numbers (email, phone_number)
-                VALUES (%s,%s)
-            """, (email, phone_number))
+            for phone in phones:
+                cur.execute("""
+                    INSERT INTO phone_numbers (email, phone_number)
+                    VALUES (%s,%s)
+                """, (email, phone))
 
-        # בדיקת תפוסה מחדש (חשוב!) לפני כתיבה
+            is_unregistered = True
+
+        # בדיקת תפוסה מחדש
         cur.execute("""
             SELECT t.`row`, t.`col`
             FROM tickets t
@@ -627,13 +776,21 @@ def order_confirm():
             if (r, c) in sold_set:
                 raise ValueError(f"Seat already taken: {r},{c}")
 
-        # יצירת order (העמודות החדשות שלך: total_price, order_date)
-        cur.execute("""
-            INSERT INTO bookings (booking_code, email, status, total_price)
-            VALUES (%s,%s,%s,%s)
-        """, (booking_code, email, "paid", total_price))
+        # הכנסת booking – לפי סוג לקוח
+        if is_registered:
+            cur.execute("""
+                INSERT INTO bookings
+                (booking_code, registered_email, unregistered_email, status, total_price)
+                VALUES (%s,%s,NULL,%s,%s)
+            """, (booking_code, email, "paid", total_price))
+        else:
+            cur.execute("""
+                INSERT INTO bookings
+                (booking_code, registered_email, unregistered_email, status, total_price)
+                VALUES (%s,NULL,%s,%s,%s)
+            """, (booking_code, email, "paid", total_price))
 
-        # הכנסת Tickets
+        # הכנסת כרטיסים
         for (r, c) in seats:
             cur.execute("""
                 INSERT INTO tickets (`row`, `col`, booking_code, flight_date, departure_time)
@@ -643,9 +800,7 @@ def order_confirm():
         mydb.commit()
         cur.close()
 
-        # ניקוי pending
         session.pop("pending_order", None)
-
         return redirect(f"/order/success?code={booking_code}")
 
     except Exception as e:
@@ -654,11 +809,11 @@ def order_confirm():
         return f"order failed: {e}", 400
 
 
+
 @app.route("/order/success")
 def order_success():
     code = request.args.get("code")
     return render_template("order_success.html", code=code)
-
 
 
 @app.route("/my_booking", methods=["GET"])
@@ -674,7 +829,10 @@ def my_bookings():
                 upcoming=[],
                 history=[],
                 single_booking=None,
-                message="Booking code must be a number."
+                message="Booking code must be a number.",
+                is_registered=False,
+                selected_status="",
+                all_statuses=[]
             )
 
         ensure_mydb_is_connected()
@@ -683,9 +841,10 @@ def my_bookings():
         cur.execute("""
             SELECT
                 b.booking_code,
-                b.email,
                 b.status,
                 b.total_price,
+                b.registered_email,
+                b.unregistered_email,
                 f.Flight_Date,
                 f.Departure_Time,
                 f.Landing_Time,
@@ -700,7 +859,7 @@ def my_bookings():
              AND f.Departure_Time = t.departure_time
             WHERE b.booking_code = %s
             GROUP BY
-                b.booking_code, b.email, b.status, b.total_price,
+                b.booking_code, b.status, b.total_price, b.registered_email, b.unregistered_email,
                 f.Flight_Date, f.Departure_Time, f.Landing_Time,
                 f.Departure_Airport, f.Destination_Airport
             LIMIT 1
@@ -716,7 +875,10 @@ def my_bookings():
                 upcoming=[],
                 history=[],
                 single_booking=None,
-                message="Booking code not found."
+                message="Booking code not found.",
+                is_registered=False,
+                selected_status="",
+                all_statuses=[]
             )
 
         seat = one.get("seats", "")
@@ -730,29 +892,85 @@ def my_bookings():
             upcoming=[],
             history=[],
             single_booking=one,
-            message=""
+            message="",
+            is_registered=False,
+            selected_status="",
+            all_statuses=[]
         )
 
-    email = session.get("username") or session.get("guest_email") or (request.args.get("email") or "").strip()
+    # ----- חיפוש לפי אימייל (משתמש מחובר / אורח / שדה חיפוש) -----
+    email = (
+        session.get("username")
+        or session.get("guest_email")
+        or (request.args.get("email") or "").strip()
+    )
 
     if not email:
-        return render_template("my_booking.html", email="", upcoming=[], history=[], message="")
+        return render_template(
+            "my_booking.html",
+            email="",
+            upcoming=[],
+            history=[],
+            single_booking=None,
+            message="",
+            is_registered=False,
+            selected_status="",
+            all_statuses=[]
+        )
 
-    # משתמש רשום = אימייל שקיים ב-registered_customers
     ensure_mydb_is_connected()
+
+    selected_status = (request.args.get("status") or "").strip()
+
+    # משתמש רשום?
     cur0 = mydb.cursor()
     cur0.execute("SELECT 1 FROM registered_customers WHERE email=%s LIMIT 1", (email,))
     is_registered = cur0.fetchone() is not None
     cur0.close()
 
-    cur = mydb.cursor(dictionary=True)
+    # ✅ כל הסטטוסים של הלקוח *לפני* סינון (רק לרשומים)
+    all_statuses = []
+    if is_registered:
+        curS = mydb.cursor()
+        curS.execute("""
+            SELECT DISTINCT b.status
+            FROM bookings b
+            WHERE b.registered_email = %s OR b.unregistered_email = %s
+        """, (email, email))  # ✅ שני פרמטרים
+        raw = curS.fetchall()
+        curS.close()
 
-    cur.execute("""
+        tmp = []
+        for row in raw:
+            st = row[0]
+            if isinstance(st, (bytes, bytearray)):
+                st = st.decode("utf-8", errors="ignore")
+            st = (st or "").strip()
+            if st:
+                tmp.append(st)
+
+        all_statuses = sorted(set(tmp), key=lambda x: x.lower())
+
+    # פילטר סטטוס רק לרשומים
+    params = [email, email]  # ✅ תמיד שני פרמטרים ל-WHERE
+    status_filter_sql = ""
+    if is_registered and selected_status:
+        status_filter_sql = " AND b.status = %s "
+        params.append(selected_status)
+
+    # ✅ אם לא רשום — אל תשלוף טיסות עבר בכלל (אין היסטוריה)
+    time_filter_sql = ""
+    if not is_registered:
+        time_filter_sql = " AND TIMESTAMP(f.Flight_Date, f.Departure_Time) >= NOW() "
+
+    cur = mydb.cursor(dictionary=True)
+    cur.execute(f"""
         SELECT
             b.booking_code,
-            b.email,
             b.status,
             b.total_price,
+            b.registered_email,
+            b.unregistered_email,
             f.Flight_Date,
             f.Departure_Time,
             f.Landing_Time,
@@ -765,14 +983,15 @@ def my_bookings():
         JOIN flights f
           ON f.Flight_Date = t.flight_date
          AND f.Departure_Time = t.departure_time
-        WHERE b.email = %s
+        WHERE b.registered_email = %s OR b.unregistered_email = %s
+        {status_filter_sql}
+        {time_filter_sql}
         GROUP BY
-            b.booking_code, b.email, b.status, b.total_price,
+            b.booking_code, b.status, b.total_price, b.registered_email, b.unregistered_email,
             f.Flight_Date, f.Departure_Time, f.Landing_Time,
             f.Departure_Airport, f.Destination_Airport
         ORDER BY f.Flight_Date DESC, f.Departure_Time DESC
-    """, (email,))
-
+    """, tuple(params))
     rows = cur.fetchall()
     cur.close()
 
@@ -798,7 +1017,7 @@ def my_bookings():
         else:
             history.append(r)
 
-    # כלל ההרשאה החדש: היסטוריה רק אם האימייל רשום בטבלת Registered_customers
+    # ✅ הגנה נוספת: אורח לא רואה היסטוריה
     if not is_registered:
         history = []
 
@@ -808,8 +1027,13 @@ def my_bookings():
         upcoming=upcoming,
         history=history,
         single_booking=None,
-        message=""
+        message="",
+        is_registered=is_registered,
+        selected_status=selected_status,
+        all_statuses=all_statuses
     )
+
+
 @app.route("/booking/cancel", methods=["POST"])
 def booking_cancel():
     booking_code = (request.form.get("booking_code") or "").strip()
@@ -824,9 +1048,13 @@ def booking_cancel():
     try:
         mydb.start_transaction()
 
-        # לוודא שההזמנה קיימת ושייכת לאותו אימייל שמוצג בדף
+        # ✅ לוודא שההזמנה קיימת + להביא את האימייל ששייך להזמנה (לפי הסכמה החדשה)
         cur.execute("""
-            SELECT booking_code, email, status, total_price
+            SELECT booking_code,
+                   registered_email,
+                   unregistered_email,
+                   status,
+                   total_price
             FROM bookings
             WHERE booking_code = %s
             LIMIT 1
@@ -837,19 +1065,22 @@ def booking_cancel():
             cur.close()
             return "Booking not found", 404
 
-        if (b["email"] or "").strip().lower() != page_email.strip().lower():
+        booking_email = (b.get("registered_email") or b.get("unregistered_email") or "").strip()
+
+        # ✅ בדיקת בעלות מול האימייל שמוצג בדף
+        if booking_email.lower() != page_email.strip().lower():
             mydb.rollback()
             cur.close()
             return "Not allowed", 403
 
         # אם כבר בוטלה
-        status_lower = (b["status"] or "").strip().lower()
+        status_lower = (b.get("status") or "").strip().lower()
         if status_lower.startswith("cancel") or status_lower.endswith("cancelled") or "cancel" in status_lower:
             mydb.rollback()
             cur.close()
             return redirect(f"/my_booking?email={page_email}")
 
-        # להביא את תאריך/שעת הטיסה מהכרטיסים (מספיק כרטיס אחד)
+        # להביא תאריך/שעת הטיסה מהכרטיסים
         cur.execute("""
             SELECT f.Flight_Date, f.Departure_Time
             FROM tickets t
@@ -872,7 +1103,7 @@ def booking_cancel():
         if not isinstance(fd, date):
             fd = datetime.strptime(str(fd)[:10], "%Y-%m-%d").date()
 
-        # normalize time (יכול להגיע כ-time או timedelta או str)
+        # normalize time
         if isinstance(dep, timedelta):
             dep = (datetime.min + dep).time()
         elif not isinstance(dep, time):
@@ -882,7 +1113,7 @@ def booking_cancel():
         now = datetime.now()
         hours_left = (flight_dt - now).total_seconds() / 3600.0
 
-        original_total = float(b["total_price"] or 0)
+        original_total = float(b.get("total_price") or 0)
 
         if hours_left > 36:
             fee = round(original_total * 0.05, 2)  # דמי ביטול = 5%
@@ -951,11 +1182,8 @@ def admin_login():
 @app.route("/admin_logout")
 def admin_logout():
     session.clear()
-    return redirect("/admin_login")
+    return render_template("Homepage.html")
 
-
-from flask import request, render_template, redirect, session
-from datetime import datetime, date, time
 
 @app.route("/admin_dashboard")
 def admin_dashboard():
@@ -1056,7 +1284,7 @@ def add_flight_with_rules(mydb, flight_date, departure_time, plane_id, landing_t
         # ---------------------------------------------------
 
         cur.execute("""
-            INSERT INTO `Flights`
+            INSERT INTO `flights`
             (`flight_date`, `departure_time`, `Plane_ID`, `Landing_Time`,
              `Departure_Airport`, `Destination_Airport`, `status`)
             VALUES (%s,%s,%s,%s,%s,%s,%s)
@@ -1087,7 +1315,7 @@ def assign_staff_to_flight_with_rules(mydb, flight_date, departure_time, plane_i
 
         # prevent duplicate assignment (optional but recommended)
         cur.execute("""
-            SELECT 1 FROM `Staff_On_Flight`
+            SELECT 1 FROM `staff_on_flight`
             WHERE `flight_date`=%s AND `departure_time`=%s AND `plane_ID`=%s AND `ID`=%s
             LIMIT 1
         """, (flight_date, departure_time, int(plane_id), int(staff_id)))
@@ -1095,7 +1323,7 @@ def assign_staff_to_flight_with_rules(mydb, flight_date, departure_time, plane_i
             return False, "Staff already assigned to this flight"
 
         cur.execute("""
-            INSERT INTO `Staff_On_Flight` (`flight_date`, `departure_time`, `plane_ID`, `ID`)
+            INSERT INTO `staff_on_flight` (`flight_date`, `departure_time`, `plane_ID`, `ID`)
             VALUES (%s,%s,%s,%s)
         """, (flight_date, departure_time, int(plane_id), int(staff_id)))
 
@@ -1182,7 +1410,7 @@ def admin_cancel_flight():
             WHERE Flight_Date=%s AND Departure_Time=%s
         """, (flight_date, departure_time))
 
-        # 2) refund & mark bookings as admin cancelled (for bookings connected to this flight via tickets)
+        #  refund & mark bookings as admin cancelled (for bookings connected to this flight via tickets)
         cur.execute("""
             UPDATE bookings b
             JOIN (
@@ -1190,10 +1418,16 @@ def admin_cancel_flight():
                 FROM tickets
                 WHERE flight_date=%s AND departure_time=%s
             ) x ON x.booking_code = b.booking_code
-            SET b.status = 'admin cancelled',
+            SET b.status = 'flyTAU cancelled',
                 b.total_price = 0.00
-            WHERE b.status NOT LIKE '%cancel%'
-              AND b.status <> 'completed'
+            WHERE LOWER(b.status) NOT LIKE '%cancel%'
+              AND LOWER(b.status) <> 'completed'
+        """, (flight_date, departure_time))
+
+        #  free staff: remove assignments for this flight
+        cur.execute("""
+            DELETE FROM staff_on_flight
+            WHERE flight_date=%s AND departure_time=%s
         """, (flight_date, departure_time))
 
         mydb.commit()
@@ -1204,6 +1438,8 @@ def admin_cancel_flight():
         mydb.rollback()
         cur.close()
         return f"Cancel failed: {e}", 400
+
+
 def insert_plane_to_db(plane_id, manufacturer, size, purchase_date):
     """
     מכניס מטוס לטבלה plane.
@@ -1236,34 +1472,102 @@ def insert_plane_to_db(plane_id, manufacturer, size, purchase_date):
     cursor.execute(sql, params)
     cursor.close()
 
-
 @app.route("/admin_add_plane", methods=["GET", "POST"])
 def admin_add_plane():
-    if request.method == "POST":
-        plane_id = request.form.get("plane_id", "").strip()
-        manufacturer = request.form.get("manufacturer", "").strip()
-        size = request.form.get("size", "").strip()
-        purchase_date = request.form.get("purchase_date", "").strip()  # YYYY-MM-DD
+    if session.get("role") != "admin":
+        return redirect("/admin_login")
 
+    if request.method == "GET":
+        return render_template("admin_add_plane.html")
+
+    # ---------- POST ----------
+    plane_id = (request.form.get("plane_id") or "").strip()
+    manufacturer = (request.form.get("manufacturer") or "").strip()
+    size = (request.form.get("size") or "").strip()
+    purchase_date = (request.form.get("purchase_date") or "").strip()  # YYYY-MM-DD
+
+    eco_rows = (request.form.get("eco_rows") or "").strip()
+    eco_cols = (request.form.get("eco_cols") or "").strip()
+    biz_rows = (request.form.get("biz_rows") or "").strip()
+    biz_cols = (request.form.get("biz_cols") or "").strip()
+
+    try:
+        if not plane_id.isdigit():
+            raise ValueError("Plane ID must be a number.")
+        plane_id_val = int(plane_id)
+
+        if size not in ("Small", "Large"):
+            raise ValueError("Size must be Small or Large.")
+
+        if not eco_rows.isdigit() or int(eco_rows) <= 0:
+            raise ValueError("Economy rows must be a positive number.")
+        if not eco_cols.isdigit() or int(eco_cols) <= 0:
+            raise ValueError("Economy columns must be a positive number.")
+
+        eco_rows_val = int(eco_rows)
+        eco_cols_val = int(eco_cols)
+
+        if size == "Large":
+            if not biz_rows.isdigit() or int(biz_rows) <= 0:
+                raise ValueError("Business rows must be a positive number for Large planes.")
+            if not biz_cols.isdigit() or int(biz_cols) <= 0:
+                raise ValueError("Business columns must be a positive number for Large planes.")
+            biz_rows_val = int(biz_rows)
+            biz_cols_val = int(biz_cols)
+        else:
+            biz_rows_val = None
+            biz_cols_val = None
+
+        ensure_mydb_is_connected()
+        cur = mydb.cursor()
+
+        # 1) insert plane
+        cur.execute("""
+            INSERT INTO plane (ID, Manufacturer, Size, Purchase_Date)
+            VALUES (%s, %s, %s, %s)
+        """, (plane_id_val, manufacturer, size, purchase_date))
+
+        # 2) insert classes
+        # תמיד Economy
+        cur.execute("""
+            INSERT INTO classes (Plane_ID, Class_Type, Number_of_Rows, Number_of_Columns)
+            VALUES (%s, 'Economy', %s, %s)
+        """, (plane_id_val, eco_rows_val, eco_cols_val))
+
+        # אם Large אז גם Business
+        if size == "Large":
+            cur.execute("""
+                INSERT INTO classes (Plane_ID, Class_Type, Number_of_Rows, Number_of_Columns)
+                VALUES (%s, 'Business', %s, %s)
+            """, (plane_id_val, biz_rows_val, biz_cols_val))
+
+        mydb.commit()
+        cur.close()
+
+        return render_template("admin_add_plane.html", success="Plane and classes added successfully!")
+
+    except mysql.connector.Error as e:
         try:
-            # אם השדה ריק נשאיר None
-            plane_id_val = plane_id if plane_id != "" else None
+            mydb.rollback()
+        except Exception:
+            pass
+        return render_template("admin_add_plane.html", error=f"Database error: {e}")
 
-            insert_plane_to_db(
-                plane_id=plane_id_val,
-                manufacturer=manufacturer,
-                size=size,
-                purchase_date=purchase_date
-            )
+    except ValueError as e:
+        try:
+            mydb.rollback()
+        except Exception:
+            pass
+        return render_template("admin_add_plane.html", error=str(e))
 
-            return render_template("admin_add_plane.html", success="Plane added successfully!")
-        except mysql.connector.Error as e:
-            # למשל Duplicate entry על ID
-            return render_template("admin_add_plane.html", error=f"Database error: {e}")
-        except ValueError as e:
-            return render_template("admin_add_plane.html", error=str(e))
+    except Exception as e:
+        try:
+            mydb.rollback()
+        except Exception:
+            pass
+        return render_template("admin_add_plane.html", error=f"Unexpected error: {e}")
 
-    return render_template("admin_add_plane.html")
+# ===== constants =====
 ALLOWED_ROLES = {"pilot", "flight_attendant"}
 ALLOWED_TRAINING = {"short", "long"}
 
@@ -1356,101 +1660,7 @@ def admin_add_crew():
     return render_template("admin_add_crew.html")
 
 
-def _normalize_date(d):
-    if isinstance(d, date):
-        return d
-    return datetime.strptime(str(d)[:10], "%Y-%m-%d").date()
 
-def _normalize_time(t):
-    if isinstance(t, time):
-        return t
-    s = str(t).split(".")[0]
-    # יכול להגיע HH:MM
-    if len(s) == 5:
-        s += ":00"
-    return datetime.strptime(s, "%H:%M:%S").time()
-
-def _compute_landing_time(cur, dep_airport, dest_airport, flight_date, departure_time):
-    """
-    Landing_Time מחושב לפי Flight_Duration:
-    landing_dt = dep_dt + duration_hours
-    נשמור רק את ה-time לטבלת Flights.
-    """
-    dur = fetch_route_duration_hours(cur, dep_airport, dest_airport)
-    if dur is None:
-        raise ValueError("Missing route in Flight_Duration for this route.")
-
-    dep_dt = datetime.combine(flight_date, departure_time)
-    land_dt = dep_dt + timedelta(hours=float(dur))
-    return land_dt.time()
-
-def _build_flight_row_for_checks(flight_date, departure_time, landing_time, dep_airport, dest_airport, plane_id):
-    return {
-        "flight_date": flight_date,
-        "departure_time": departure_time,
-        "landing_time": landing_time,
-        "dep_airport": dep_airport,
-        "dest_airport": dest_airport,
-        "plane_id": int(plane_id),
-        "status": "active"
-    }
-
-def _fetch_available_resources(cur, flight_date, departure_time, dep_airport, dest_airport):
-    """
-    מחזיר:
-      landing_time (מחושב),
-      available_planes: list[int],
-      available_pilots: list[dict{id,fname,lname}],
-      available_attendants: list[dict{id,fname,lname}]
-    """
-    landing_time = _compute_landing_time(cur, dep_airport, dest_airport, flight_date, departure_time)
-
-    # ---- PLANES ----
-    cur.execute("SELECT `ID` AS id FROM `Plane`")
-    plane_ids = [r["id"] for r in (cur.fetchall() or [])]
-
-    available_planes = []
-    for pid in plane_ids:
-        flight_row = _build_flight_row_for_checks(flight_date, departure_time, landing_time, dep_airport, dest_airport, pid)
-
-        ok, _msg = can_use_plane(cur, flight_row, pid)
-        if not ok:
-            continue
-
-        # כלל: טיסה ארוכה => BIG plane
-        try:
-            validate_long_flight_plane_size(cur, flight_row)
-        except Exception:
-            continue
-
-        available_planes.append(int(pid))
-
-    # ---- PILOTS ----
-    cur.execute("SELECT `ID` AS id, `fname` AS fname, `lname` AS lname FROM `Pilot`")
-    pilots = cur.fetchall() or []
-    available_pilots = []
-    for p in pilots:
-        # שים plane_id זמני (לא משפיע על בדיקות staff) — נשתמש ב-1 אם אין
-        temp_plane = available_planes[0] if available_planes else 1
-        flight_row = _build_flight_row_for_checks(flight_date, departure_time, landing_time, dep_airport, dest_airport, temp_plane)
-
-        ok, _msg = can_assign_staff(cur, flight_row, int(p["id"]))
-        if ok:
-            available_pilots.append({"id": int(p["id"]), "fname": p["fname"], "lname": p["lname"]})
-
-    # ---- ATTENDANTS ----
-    cur.execute("SELECT `ID` AS id, `fname` AS fname, `lname` AS lname FROM `Flight_Attendant`")
-    attendants = cur.fetchall() or []
-    available_attendants = []
-    for a in attendants:
-        temp_plane = available_planes[0] if available_planes else 1
-        flight_row = _build_flight_row_for_checks(flight_date, departure_time, landing_time, dep_airport, dest_airport, temp_plane)
-
-        ok, _msg = can_assign_staff(cur, flight_row, int(a["id"]))
-        if ok:
-            available_attendants.append({"id": int(a["id"]), "fname": a["fname"], "lname": a["lname"]})
-
-    return landing_time, available_planes, available_pilots, available_attendants
 
 
 @app.route("/admin_add_flight", methods=["GET", "POST"])
@@ -1458,6 +1668,7 @@ def admin_add_flight():
     if session.get("role") != "admin":
         return redirect("/admin_login")
 
+    TEMPLATE = "admin_add_flight.html"  # ✅ אצלכם זה שם הקובץ
     ensure_mydb_is_connected()
     cur = mydb.cursor(dictionary=True)
 
@@ -1465,7 +1676,7 @@ def admin_add_flight():
     if request.method == "GET":
         airports = fetch_airports_from_flight_duration(cur)
         cur.close()
-        return render_template("admin_add_flight.html", airports=airports)
+        return render_template(TEMPLATE, airports=airports, step=1)
 
     step = (request.form.get("step", "1") or "1").strip()
 
@@ -1483,7 +1694,6 @@ def admin_add_flight():
                 cur, flight_date, departure_time, dep_airport, dest_airport
             )
 
-            # ✅ מינימום צוות לפני בחירת מטוס (טיסה קצרה): 2 טייסים + 3 דיילים
             MIN_PILOTS = 2
             MIN_ATT = 3
 
@@ -1494,15 +1704,11 @@ def admin_add_flight():
                 missing.append("אין מספיק דיילים")
 
             if missing:
-                msg = (
-                    f"{' ו'.join(missing)} בתאריך/שעה/שדה שבחרת. "
-                    "חזור לdashboard."
-                )
-
+                msg = f"{' ו'.join(missing)} בתאריך/שעה/שדה שבחרת. חזור לdashboard."
                 airports = fetch_airports_from_flight_duration(cur)
                 cur.close()
                 return render_template(
-                    "admin_add_flight.html",
+                    TEMPLATE,
                     step=1,
                     error=msg,
                     airports=airports,
@@ -1513,32 +1719,26 @@ def admin_add_flight():
                     show_back_only=True
                 )
 
-            # אם יש מינימום צוות — ממשיכים ל-Step 2
             cur.close()
             return render_template(
-                "admin_add_flight.html",
+                TEMPLATE,
                 step=2,
                 flight_date=str(flight_date),
                 departure_time=departure_time.strftime("%H:%M"),
                 departure_airport=dep_airport,
                 destination_airport=dest_airport,
                 landing_time=landing_time.strftime("%H:%M") if landing_time else None,
-                available_planes=available_planes
+                available_planes=available_planes,
+                selected_plane_id=""
             )
 
         except Exception as e:
             airports = fetch_airports_from_flight_duration(cur)
             cur.close()
-            return render_template(
-                "admin_add_flight.html",
-                step=1,
-                error=str(e),
-                airports=airports,
-                show_back_only=True
-            )
+            return render_template(TEMPLATE, step=1, error=str(e), airports=airports, show_back_only=True)
 
     # =========================================================
-    # STEP 2: choose plane only -> then proceed to step 3
+    # STEP 2: choose plane -> proceed to step 3
     # =========================================================
     if step == "2":
         try:
@@ -1554,14 +1754,14 @@ def admin_add_flight():
 
             if not plane_id:
                 html = render_template(
-                    "admin_add_flight.html",
+                    TEMPLATE,
                     step=2,
                     error="Please choose a plane.",
                     flight_date=str(flight_date),
                     departure_time=departure_time.strftime("%H:%M"),
                     departure_airport=dep_airport,
                     destination_airport=dest_airport,
-                    landing_time=landing_time.strftime("%H:%M"),
+                    landing_time=landing_time.strftime("%H:%M") if landing_time else None,
                     available_planes=available_planes,
                     selected_plane_id=""
                 )
@@ -1570,29 +1770,32 @@ def admin_add_flight():
 
             if int(plane_id) not in set(available_planes):
                 html = render_template(
-                    "admin_add_flight.html",
+                    TEMPLATE,
                     step=2,
                     error="Selected plane is not available for this flight.",
                     flight_date=str(flight_date),
                     departure_time=departure_time.strftime("%H:%M"),
                     departure_airport=dep_airport,
                     destination_airport=dest_airport,
-                    landing_time=landing_time.strftime("%H:%M"),
+                    landing_time=landing_time.strftime("%H:%M") if landing_time else None,
                     available_planes=available_planes,
                     selected_plane_id=plane_id
                 )
                 cur.close()
                 return html
 
-            plane_size = fetch_plane_size(cur, int(plane_id))
-            if not plane_size:
-                raise ValueError("Plane not found.")
+            # ✅ plane size מהטבלה plane
+            cur.execute("SELECT Size FROM plane WHERE ID=%s LIMIT 1", (int(plane_id),))
+            p = cur.fetchone()
+            if not p or not p.get("Size"):
+                raise ValueError("Plane size not found in plane table.")
+            plane_size = str(p["Size"]).strip()
+            show_business = (plane_size.lower() == "large")
 
             req = required_crew_by_plane_size(plane_size)
             req_pilots = req["pilots"]
             req_attendants = req["attendants"]
 
-            # עכשיו מביאים רשימות צוות זמינות (תלויות בזמן+מיקום)
             _, _, available_pilots, available_attendants = _fetch_available_resources(
                 cur, flight_date, departure_time, dep_airport, dest_airport
             )
@@ -1600,31 +1803,35 @@ def admin_add_flight():
             req_text = f"Plane {plane_id} is {plane_size}. You must select exactly {req_pilots} pilots and {req_attendants} attendants."
 
             html = render_template(
-                "admin_add_flight.html",
+                TEMPLATE,
                 step=3,
                 flight_date=str(flight_date),
                 departure_time=departure_time.strftime("%H:%M"),
                 departure_airport=dep_airport,
                 destination_airport=dest_airport,
-                landing_time=landing_time.strftime("%H:%M"),
+                landing_time=landing_time.strftime("%H:%M") if landing_time else None,
                 selected_plane_id=plane_id,
+                plane_size=plane_size,
+                show_business=show_business,
                 req_pilots=req_pilots,
                 req_attendants=req_attendants,
                 req_text=req_text,
                 available_pilots=available_pilots,
                 available_attendants=available_attendants,
                 selected_pilot_ids=[],
-                selected_attendant_ids=[]
+                selected_attendant_ids=[],
+                economy_price="",
+                business_price=""
             )
             cur.close()
             return html
 
         except Exception as e:
             cur.close()
-            return render_template("admin_add_flight.html", error=str(e))
+            return render_template(TEMPLATE, step=2, error=str(e))
 
     # =========================================================
-    # STEP 3: select crew -> create flight + staff_on_flight
+    # STEP 3: crew (checkboxes) + prices (editable) -> insert
     # =========================================================
     try:
         flight_date = _normalize_date(request.form.get("flight_date", "").strip())
@@ -1633,117 +1840,371 @@ def admin_add_flight():
         dest_airport = request.form.get("destination_airport", "").strip().upper()
 
         plane_id = (request.form.get("plane_id", "") or "").strip()
-        chosen_pilots = request.form.getlist("pilot_ids")
-        chosen_attendants = request.form.getlist("attendant_ids")
+        chosen_pilots = request.form.getlist("pilot_ids")          # ✅ checkboxes
+        chosen_attendants = request.form.getlist("attendant_ids")  # ✅ checkboxes
 
-        # מחשבים שוב (הגנה)
+        economy_price_raw = (request.form.get("economy_price") or "").strip()
+        business_price_raw = (request.form.get("business_price") or "").strip()
+
         landing_time, available_planes, available_pilots, available_attendants = _fetch_available_resources(
             cur, flight_date, departure_time, dep_airport, dest_airport
         )
 
+        if not plane_id:
+            raise ValueError("Missing plane.")
+
+        if int(plane_id) not in set(available_planes):
+            raise ValueError("Selected plane is not available for this flight.")
+
+        # ✅ size מהטבלה plane
+        cur.execute("SELECT Size FROM plane WHERE ID=%s LIMIT 1", (int(plane_id),))
+        p = cur.fetchone()
+        if not p or not p.get("Size"):
+            raise ValueError("Plane size not found in plane table.")
+        plane_size = str(p["Size"]).strip()
+        show_business = (plane_size.lower() == "large")
+
+        req = required_crew_by_plane_size(plane_size)
+
         def render_step3_error(msg):
-            req_pilots = None
-            req_attendants = None
-            req_text = ""
-
-            if plane_id and plane_id.isdigit():
-                size = fetch_plane_size(cur, int(plane_id))
-                if size:
-                    req = required_crew_by_plane_size(size)
-                    req_pilots = req["pilots"]
-                    req_attendants = req["attendants"]
-                    req_text = f"Plane {plane_id} is {size}. You must select exactly {req_pilots} pilots and {req_attendants} attendants."
-
-            html = render_template(
-                "admin_add_flight.html",
+            req_text = f"Plane {plane_id} is {plane_size}. You must select exactly {req['pilots']} pilots and {req['attendants']} attendants."
+            return render_template(
+                TEMPLATE,
                 step=3,
                 error=msg,
                 flight_date=str(flight_date),
                 departure_time=departure_time.strftime("%H:%M"),
                 departure_airport=dep_airport,
                 destination_airport=dest_airport,
-                landing_time=landing_time.strftime("%H:%M"),
+                landing_time=landing_time.strftime("%H:%M") if landing_time else None,
                 selected_plane_id=plane_id,
-                req_pilots=req_pilots,
-                req_attendants=req_attendants,
+                plane_size=plane_size,
+                show_business=show_business,
+                req_pilots=req["pilots"],
+                req_attendants=req["attendants"],
                 req_text=req_text,
                 available_pilots=available_pilots,
                 available_attendants=available_attendants,
                 selected_pilot_ids=[int(x) for x in chosen_pilots if str(x).isdigit()],
-                selected_attendant_ids=[int(x) for x in chosen_attendants if str(x).isdigit()]
+                selected_attendant_ids=[int(x) for x in chosen_attendants if str(x).isdigit()],
+                economy_price=economy_price_raw,
+                business_price=business_price_raw
             )
-            return html
 
-        if not plane_id:
-            html = render_step3_error("Missing plane. Please go back and choose a plane.")
-            cur.close()
-            return html
-
-        if int(plane_id) not in set(available_planes):
-            html = render_step3_error("Selected plane is not available for this flight.")
-            cur.close()
-            return html
-
-        plane_size = fetch_plane_size(cur, int(plane_id))
-        req = required_crew_by_plane_size(plane_size)
-
+        # ✅ בדיקת כמויות צוות
         if len(chosen_pilots) != req["pilots"]:
-            html = render_step3_error(f"You must select exactly {req['pilots']} pilots.")
             cur.close()
-            return html
+            return render_step3_error(f"You must select exactly {req['pilots']} pilots.")
 
         if len(chosen_attendants) != req["attendants"]:
-            html = render_step3_error(f"You must select exactly {req['attendants']} attendants.")
             cur.close()
-            return html
+            return render_step3_error(f"You must select exactly {req['attendants']} attendants.")
 
+        # ✅ בדיקת זמינות הצוות
         avail_pilot_ids = {p["id"] for p in available_pilots}
         avail_att_ids = {a["id"] for a in available_attendants}
 
         for sid in chosen_pilots:
-            if int(sid) not in avail_pilot_ids:
-                html = render_step3_error("One selected pilot is not available.")
+            if not str(sid).isdigit() or int(sid) not in avail_pilot_ids:
                 cur.close()
-                return html
+                return render_step3_error("One selected pilot is not available.")
 
         for sid in chosen_attendants:
-            if int(sid) not in avail_att_ids:
-                html = render_step3_error("One selected attendant is not available.")
+            if not str(sid).isdigit() or int(sid) not in avail_att_ids:
                 cur.close()
-                return html
+                return render_step3_error("One selected attendant is not available.")
 
+        # ✅ ולידציה למחירים (מנהל מקליד)
+        try:
+            economy_price = Decimal(economy_price_raw)
+        except (InvalidOperation, ValueError):
+            cur.close()
+            return render_step3_error("Economy price must be a valid number.")
+
+        if economy_price <= 0:
+            cur.close()
+            return render_step3_error("Economy price must be greater than 0.")
+
+        business_price = None
+        if show_business:
+            try:
+                business_price = Decimal(business_price_raw)
+            except (InvalidOperation, ValueError):
+                cur.close()
+                return render_step3_error("Business price must be a valid number for Large planes.")
+            if business_price <= 0:
+                cur.close()
+                return render_step3_error("Business price must be greater than 0.")
+        else:
+            business_price = None  # Small -> אין ביזנס
+
+        # הגנות נוספות
         flight_row = _build_flight_row_for_checks(
             flight_date, departure_time, landing_time, dep_airport, dest_airport, int(plane_id)
         )
         validate_long_flight_plane_size(cur, flight_row)
 
-        # INSERT Flights
+        # ✅ INSERT לטבלת Flights כולל מחירים
         cur.execute("""
-            INSERT INTO `Flights`
+            INSERT INTO `flights`
               (`Flight_Date`, `Departure_Time`, `Plane_ID`, `Landing_Time`,
-               `Departure_Airport`, `Destination_Airport`, `status`)
+               `Departure_Airport`, `Destination_Airport`, `status`,
+               `economy_price`, `business_price`)
             VALUES
-              (%s, %s, %s, %s, %s, %s, 'active')
-        """, (flight_date, departure_time, int(plane_id), landing_time, dep_airport, dest_airport))
+              (%s, %s, %s, %s, %s, %s, 'active', %s, %s)
+        """, (
+            flight_date, departure_time, int(plane_id), landing_time,
+            dep_airport, dest_airport,
+            float(economy_price),
+            float(business_price) if business_price is not None else None
+        ))
 
-        # INSERT Staff_On_Flight  (✅ plane_id)
+        # ✅ INSERT Staff_On_Flight
         all_staff_ids = [int(x) for x in chosen_pilots] + [int(x) for x in chosen_attendants]
         for sid in all_staff_ids:
             cur.execute("""
-                INSERT INTO `Staff_On_Flight`
-                  (`ID`, `Flight_Date`, `Departure_Time`, `plane_id`)
+                INSERT INTO `staff_on_flight`
+                  (`ID`, `flight_date`, `departure_time`, `plane_ID`)
                 VALUES
                   (%s, %s, %s, %s)
             """, (sid, flight_date, departure_time, int(plane_id)))
 
         mydb.commit()
         cur.close()
-        return render_template("admin_add_flight.html", success="Flight created successfully!")
+        return render_template(TEMPLATE, step=1, success="Flight created successfully!")
 
     except Exception as e:
         mydb.rollback()
         cur.close()
-        return render_template("admin_add_flight.html", error=str(e))
+        return render_template(TEMPLATE, step=1, error=str(e))
 
-# if __name__ == "__main__": # uncomment if using local, comment if using pythonanywhere.
-#     app.run(debug=True)
+def generate_admin_stats_report(mydb, app_root_path):
+
+    # 🎨 Colors
+    LIGHT_PURPLE = "#EAE6FF"
+    TURQUOISE = "#8FB9A8"
+
+    # 📁 Output folder
+    out_dir = os.path.join(app_root_path, "static", "reports")
+    os.makedirs(out_dir, exist_ok=True)
+
+    cancel_img = "reports/cancellation_rate.png"
+    dest_pie_img = "reports/popular_destination_pie.png"
+
+    cancel_img_path = os.path.join(out_dir, "cancellation_rate.png")
+    dest_pie_path = os.path.join(out_dir, "popular_destination_pie.png")
+
+    cur = mydb.cursor(dictionary=True)
+
+    # ==========================================================
+    # 1️⃣ Cancellation rate – last 3 months
+    # ==========================================================
+    cur.execute("""
+        SELECT
+            YEAR(t.flight_date) AS yy,
+            MONTH(t.flight_date) AS mm,
+            COUNT(DISTINCT b.booking_code) AS total_bookings,
+            COUNT(DISTINCT CASE
+                WHEN LOWER(b.status) LIKE '%customer cancelled%' THEN b.booking_code
+            END) AS cancelled
+        FROM tickets t
+        JOIN bookings b ON b.booking_code = t.booking_code
+        WHERE t.flight_date >= DATE_SUB(CURDATE(), INTERVAL 3 MONTH)
+        GROUP BY yy, mm
+        ORDER BY yy, mm
+    """)
+    rows = cur.fetchall()
+
+    monthly_rows = []
+
+    if rows:
+        df = pd.DataFrame(rows)
+        df["rate"] = df.apply(
+            lambda r: float(r["cancelled"]) / float(r["total_bookings"])
+            if r["total_bookings"] else 0,
+            axis=1
+        )
+        df["month_dt"] = df.apply(lambda r: datetime(int(r.yy), int(r.mm), 1), axis=1)
+        df["MonthLabel"] = df["month_dt"].dt.strftime("%b-%Y")
+
+        # 📈 Plot
+        plt.figure(figsize=(8, 4))
+        plt.plot(
+            df["month_dt"],
+            df["rate"],
+            color=TURQUOISE,
+            linewidth=3,
+            marker="o",
+            markerfacecolor=LIGHT_PURPLE,
+            markeredgecolor=TURQUOISE
+        )
+        plt.title("Customer Cancellation Rate (Last 3 Months)")
+        plt.xlabel("Month")
+        plt.ylabel("Cancellation Rate")
+        plt.ylim(0, 1)
+        plt.grid(True, alpha=0.35)
+        plt.xticks(df["month_dt"], df["MonthLabel"], rotation=45)
+        plt.tight_layout()
+        plt.savefig(cancel_img_path, dpi=150)
+        plt.close()
+
+    # ==========================================================
+    # 2️⃣ Most popular destination – pie chart
+    # ==========================================================
+    cur.execute("""
+        SELECT
+            f.Destination_Airport AS destination,
+            COUNT(*) AS tickets_sold
+        FROM tickets t
+        JOIN bookings b ON b.booking_code = t.booking_code
+        JOIN flights f
+          ON f.Flight_Date = t.flight_date
+         AND f.Departure_Time = t.departure_time
+        WHERE t.flight_date >= DATE_SUB(CURDATE(), INTERVAL 3 MONTH)
+          AND LOWER(b.status) NOT LIKE '%cancel%'
+        GROUP BY destination
+        ORDER BY tickets_sold DESC
+    """)
+    dest_rows = cur.fetchall()
+
+    top_destination = None
+    top_destination_tickets = 0
+
+    if dest_rows:
+        ddf = pd.DataFrame(dest_rows)
+        labels = ddf["destination"].tolist()
+        values = ddf["tickets_sold"].tolist()
+
+        top_destination = labels[0]
+        top_destination_tickets = int(values[0])
+
+        explode = [0.08] + [0] * (len(values) - 1)
+        colors = plt.cm.PRGn(np.linspace(0.15, 0.85, len(values)))
+
+        plt.figure(figsize=(7, 5))
+        plt.pie(
+            values,
+            labels=labels,
+            autopct="%1.1f%%",
+            startangle=90,
+            explode=explode,
+            colors=colors
+        )
+        plt.title(f"Most Popular Destination: {top_destination}")
+        plt.tight_layout()
+        plt.savefig(dest_pie_path, dpi=150)
+        plt.close()
+
+    # הנתונים לפי הפלט ששלחת
+    data = [
+        {"Size": "Large", "Manufacturer": "Airbus", "Class_Type": "business", "revenue": 1840.00},
+        {"Size": "Large", "Manufacturer": "Airbus", "Class_Type": "economy", "revenue": 915.00},
+        {"Size": "Small", "Manufacturer": "Airbus", "Class_Type": "economy", "revenue": 0.00},
+        {"Size": "Large", "Manufacturer": "Boeing", "Class_Type": "business", "revenue": 0.00},
+        {"Size": "Large", "Manufacturer": "Boeing", "Class_Type": "economy", "revenue": 0.00},
+        {"Size": "Small", "Manufacturer": "Boeing", "Class_Type": "economy", "revenue": 460.00},
+        {"Size": "Small", "Manufacturer": "Dassault", "Class_Type": "economy", "revenue": 100.00},
+    ]
+
+    df = pd.DataFrame(data)
+
+    # יצירת קטגוריה לכל "מטוס" (כאן: Manufacturer + Size)
+    df["plane_group"] = df["Manufacturer"] + " " + df["Size"]
+
+    # Pivot לטבלה רחבה לגרף (business/economy כעמודות)
+    pivot = (df.pivot_table(index="plane_group",
+                            columns="Class_Type",
+                            values="revenue",
+                            aggfunc="sum",
+                            fill_value=0)
+             .reset_index())
+
+    # ודא ששתי העמודות קיימות (גם אם אין business בכלל בחלק מהקבוצות)
+    if "business" not in pivot.columns:
+        pivot["business"] = 0
+    if "economy" not in pivot.columns:
+        pivot["economy"] = 0
+
+    # סדר עמודות קבוע
+    pivot = pivot[["plane_group", "business", "economy"]]
+
+    print(pivot)  # זו הטבלה שתוכל להשתמש בה גם לכל צורך נוסף
+
+    # --- גרף ---
+    labels = pivot["plane_group"].tolist()
+    x = np.arange(len(labels))
+    width = 0.38
+
+    business_vals = pivot["business"].values
+    economy_vals = pivot["economy"].values
+
+    # צבעים: לילך + ירוק
+    lilac = "#EAE6FF"
+    green = "#8FB9A8"
+
+    plt.figure(figsize=(10, 5))
+    plt.bar(x - width / 2, business_vals, width, label="business", color=lilac)
+    plt.bar(x + width / 2, economy_vals, width, label="economy", color=green)
+
+    plt.xticks(x, labels, rotation=0)
+    plt.xlabel("Plane group (Manufacturer + Size)")
+    plt.ylabel("Revenue")
+    plt.title("Revenue Comparison: Business vs Economy")
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig("static/reports/revenue_by_plane_group.png", dpi=150)
+    plt.close()
+    # ==========================================================
+    # 3️⃣ Monthly averages table – last 3 months
+    # ==========================================================
+    cur.execute("""
+        SELECT
+            DATE_FORMAT(t.flight_date, '%b-%Y') AS MonthLabel,
+            COUNT(DISTINCT CONCAT(t.flight_date, t.departure_time)) AS flights_count,
+            COUNT(DISTINCT b.booking_code) AS bookings_count,
+            ROUND(SUM(b.total_price), 2) AS revenue_total,
+            ROUND(
+                SUM(CASE WHEN LOWER(b.status) LIKE '%customer cancelled%' THEN 1 ELSE 0 END)
+                / COUNT(DISTINCT b.booking_code), 2
+            ) AS customer_cancel_rate
+        FROM tickets t
+        JOIN bookings b ON b.booking_code = t.booking_code
+        WHERE t.flight_date >= DATE_SUB(CURDATE(), INTERVAL 3 MONTH)
+        GROUP BY MonthLabel
+        ORDER BY MIN(t.flight_date)
+    """)
+    monthly_rows = cur.fetchall()
+
+    cur.close()
+
+    return {
+        "cancel_img": cancel_img,
+        "dest_pie_img": dest_pie_img,
+        "monthly_rows": monthly_rows,
+        "top_destination": top_destination,
+        "top_destination_tickets": top_destination_tickets
+    }
+
+@app.route("/admin_statistics", methods=["GET"])
+def admin_statistics():
+    # אם אצלך יש בדיקת אדמין אחרת - תשאיר אותה כמו שהיא
+    if session.get("role") != "admin":
+        return redirect("/admin_login")
+
+    ensure_mydb_is_connected()
+
+    report = generate_admin_stats_report(mydb, app.root_path)
+
+    return render_template(
+        "admin_statistics.html",
+        cancel_img=report["cancel_img"],
+        dest_pie_img=report["dest_pie_img"],
+        monthly_rows=report["monthly_rows"],
+        top_destination=report["top_destination"],
+        top_destination_tickets=report["top_destination_tickets"]
+    )
+@app.route('/board')
+def board_page():
+    return render_template('board.html')
+if __name__ == "__main__": # uncomment if using local, comment if using pythonanywhere.
+    app.run(debug=True)

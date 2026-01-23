@@ -157,12 +157,17 @@
       cursor:pointer;
       font-weight:bold;
       background:#fff;
+      color: #0E1D2D;   /* ✅ טקסט שחור */
     }
 
-    .seat-btn.available:hover{
-      background:rgba(201,182,255,.18);
-      border-color:rgba(201,182,255,.7);
+
+    /* hover רק על מושב זמין שעדיין לא נבחר */
+    .seat-btn.available:not(.selected):hover{
+      background: rgba(201,182,255,0.45);   /* לילך בהיר */
+      border-color: #C9B6FF;
+      color: #0E1D2D;                       /* טקסט שחור */
     }
+
 
     .seat-btn.sold{
       background:#CBD5E1;
@@ -172,9 +177,9 @@
     }
 
     .seat-btn.selected{
-      background:#4A7A87;
-      color:#fff;
-      border-color:#4A7A87;
+        background: #4A7A87;                  /* ירוק-טורקיז של האתר */
+        border-color: #4A7A87;
+        color: #FFFFFF;
     }
 
     .actions{
@@ -230,15 +235,17 @@
     <h1>Select Seats</h1>
 
     <div class="summary">
-      <div class="row"><b>Flight:</b> {{ flight_date }} {{ departure_time }} | {{ flight.Departure_Airport }} → {{ flight.Destination_Airport }}</div>
-<!--      <div class="row"><b>Plane ID:</b> {{ Plane_ID }}</div>-->
-<!--      <div class="row"><b>Available seats:</b> {{ available }}</div>-->
-      {% if message %}
-        <div class="warning">{{ message }}</div>
-      {% endif %}
+      <div class="row">
+        <b>Flight:</b> {{ flight_date }} {{ departure_time }} | {{ flight.Departure_Airport }} → {{ flight.Destination_Airport }}
+      </div>
+
+      <!-- ✅ הודעה גם מהשרת וגם מה-JS -->
+      <div id="warning_box" class="warning" style="{% if not message %}display:none;{% endif %}">
+        {{ message or "" }}
+      </div>
     </div>
 
-    <form method="POST" action="/order/preview">
+    <form id="seatForm" method="POST" action="/order/preview">
       <input type="hidden" name="flight_date" value="{{ flight_date }}">
       <input type="hidden" name="departure_time" value="{{ departure_time }}">
       <input type="hidden" id="selected_seats" name="selected_seats" value="">
@@ -307,6 +314,19 @@
   const selected = new Set();
   const hidden = document.getElementById("selected_seats");
   const txt = document.getElementById("selected_text");
+  const form = document.getElementById("seatForm");
+  const warningBox = document.getElementById("warning_box");
+
+  function showWarning(msg){
+    warningBox.textContent = msg;
+    warningBox.style.display = "block";
+    warningBox.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  function hideWarning(){
+    warningBox.textContent = "";
+    warningBox.style.display = "none";
+  }
 
   function refreshSelected(){
     const arr = Array.from(selected);
@@ -325,7 +345,16 @@
         btn.classList.add("selected");
       }
       refreshSelected();
+      if (selected.size > 0) hideWarning();
     });
+  });
+
+  // ✅ חובה לבחור לפחות מושב אחד
+  form.addEventListener("submit", function(e){
+    if (selected.size === 0){
+      e.preventDefault();
+      showWarning("You must select at least one seat before continuing.");
+    }
   });
 
   refreshSelected();

@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date, time
 
 # =========================================================
 # A) Fetch helpers (Flights / Plane / Booking / Tickets)
@@ -18,7 +18,7 @@ def fetch_flight(cur, flight_date, departure_time, plane_id):
             `Departure_Airport`      AS dep_airport,
             `Destination_Airport`    AS dest_airport,
             `status`                 AS status
-        FROM `Flights`
+        FROM `flights`
         WHERE `Flight_Date`=%s AND `Departure_Time`=%s AND `Plane_ID`=%s
         LIMIT 1
     """, (flight_date, departure_time, int(plane_id)))
@@ -46,10 +46,9 @@ def fetch_booking(cur, booking_code: int):
     cur.execute("""
         SELECT
             `booking_code` AS booking_code,
-            `email`      AS email,
-            `status`       AS status,
+             COALESCE(registered_email, unregistered_email) AS email,            `status`       AS status,
             `total_price`  AS total_price
-        FROM `Bookings`
+        FROM `bookings`
         WHERE `booking_code`=%s
         LIMIT 1
     """, (int(booking_code),))
@@ -62,7 +61,7 @@ def count_tickets_in_booking(cur, booking_code: int) -> int:
     """
     cur.execute("""
         SELECT COUNT(*) AS cnt
-        FROM `Tickets`
+        FROM `tickets`
         WHERE `booking_code F`=%s
     """, (int(booking_code),))
     row = cur.fetchone()
@@ -74,7 +73,7 @@ def fetch_flight_airports(cur, flight_date, departure_time, plane_id):
         SELECT
             `Departure_Airport`   AS dep_airport,
             `Destination_Airport` AS dest_airport
-        FROM `Flights`
+        FROM `flights`
         WHERE `Flight_Date`=%s AND `Departure_Time`=%s AND `Plane_ID`=%s
         LIMIT 1
     """, (flight_date, departure_time, int(plane_id)))
@@ -142,7 +141,7 @@ def fetch_route_duration_hours(cur, dep_airport: str, dest_airport: str) -> floa
     """
     cur.execute("""
         SELECT `Duration_in_Hours` AS dur
-        FROM `Flight_Duration`
+        FROM `flight_duration`
         WHERE `Departure_Airport`=%s AND `Destination_Airport`=%s
         LIMIT 1
     """, (dep_airport, dest_airport))
@@ -205,7 +204,7 @@ def is_pilot(cur, staff_id: int) -> bool:
 
 
 def is_attendant(cur, staff_id: int) -> bool:
-    cur.execute("SELECT 1 FROM `Flight_Attendant` WHERE `ID`=%s LIMIT 1", (int(staff_id),))
+    cur.execute("SELECT 1 FROM `flight_attendant` WHERE `ID`=%s LIMIT 1", (int(staff_id),))
     return cur.fetchone() is not None
 
 
@@ -224,8 +223,8 @@ def staff_role(cur, staff_id: int) -> str | None:
 def staff_ids_on_flight(cur, flight_date, departure_time, plane_id):
     cur.execute("""
         SELECT `ID` AS staff_id
-        FROM `Staff_On_Flight`
-        WHERE `Flight_Date`=%s AND `Departure_Time`=%s AND `plane_ID`=%s
+        FROM `staff_on_flight`
+        WHERE `flight_date`=%s AND `departure_time`=%s AND `plane_ID`=%s
     """, (flight_date, departure_time, int(plane_id)))
     return [r["staff_id"] for r in (cur.fetchall() or [])]
 
@@ -254,42 +253,49 @@ def crew_complete_for_flight(cur, flight_row) -> bool:
 # =========================================================
 # H) Time conflicts (staff / plane)
 # =========================================================
-
-def staff_assigned_flights(cur, staff_id: int):
+def staff_assigned_flights(cur, staff_id: int, include_cancelled: bool = False):
     """
     כל הטיסות שה-ID הזה משובץ אליהן דרך Staff_On_Flight.
+    ברירת מחדל: לא מחזירים טיסות cancelled (כדי שביטול ישחרר צוות).
     """
-    cur.execute("""
+    sql = """
         SELECT
             f.`Flight_Date`         AS flight_date,
             f.`Departure_Time`      AS departure_time,
-            f.`Plane_ID`          AS plane_id,
+            f.`Plane_ID`            AS plane_id,
             f.`Landing_Time`        AS landing_time,
             f.`Departure_Airport`   AS dep_airport,
             f.`Destination_Airport` AS dest_airport,
             f.`status`              AS status
-        FROM `Staff_On_Flight` sof
-        JOIN `Flights` f
+        FROM `staff_on_flight` sof
+        JOIN `flights` f
           ON f.`Flight_Date`=sof.`flight_date`
          AND f.`Departure_Time`=sof.`departure_time`
          AND f.`Plane_ID`=sof.`plane_ID`
         WHERE sof.`ID`=%s
-    """, (int(staff_id),))
-    return cur.fetchall() or []
+    """
+    params = [int(staff_id)]
 
+    if not include_cancelled:
+        sql += " AND LOWER(f.`status`) NOT LIKE '%cancel%' "
+
+    cur.execute(sql, tuple(params))
+    return cur.fetchall() or []
 
 def has_time_conflict_staff(cur, flight_row, staff_id: int) -> bool:
     new_start, new_end = flight_time_range(flight_row)
 
-    for f in staff_assigned_flights(cur, staff_id):
-        if (f["flight_date"], f["departure_time"], f["plane_id"]) == (flight_row["flight_date"], flight_row["departure_time"], flight_row["plane_id"]):
+    # ✅ לא לכלול cancelled — כדי שביטול ישחרר צוות
+    for f in staff_assigned_flights(cur, staff_id, include_cancelled=False):
+        if (f["flight_date"], f["departure_time"], f["plane_id"]) == (
+            flight_row["flight_date"], flight_row["departure_time"], flight_row["plane_id"]
+        ):
             continue
         start, end = flight_time_range(f)
         if ranges_overlap(new_start, new_end, start, end):
             return True
 
     return False
-
 
 def has_time_conflict_plane(cur, flight_row, plane_id: int) -> bool:
     new_start, new_end = flight_time_range(flight_row)
@@ -298,18 +304,21 @@ def has_time_conflict_plane(cur, flight_row, plane_id: int) -> bool:
         SELECT
             `Flight_Date`         AS flight_date,
             `Departure_Time`      AS departure_time,
-            `Plane_ID`          AS plane_id,
+            `Plane_ID`            AS plane_id,
             `Landing_Time`        AS landing_time,
             `Departure_Airport`   AS dep_airport,
             `Destination_Airport` AS dest_airport,
             `status`              AS status
-        FROM `Flights`
+        FROM `flights`
         WHERE `Plane_ID`=%s
+          AND LOWER(`status`) NOT LIKE '%cancel%'   -- ✅ מתעלמים ממבוטלות
     """, (int(plane_id),))
     flights = cur.fetchall() or []
 
     for f in flights:
-        if (f["flight_date"], f["departure_time"], f["plane_id"]) == (flight_row["flight_date"], flight_row["departure_time"], flight_row["plane_id"]):
+        if (f["flight_date"], f["departure_time"], f["plane_id"]) == (
+            flight_row["flight_date"], flight_row["departure_time"], flight_row["plane_id"]
+        ):
             continue
         start, end = flight_time_range(f)
         if ranges_overlap(new_start, new_end, start, end):
@@ -317,20 +326,18 @@ def has_time_conflict_plane(cur, flight_row, plane_id: int) -> bool:
 
     return False
 
-
 # =========================================================
 # I) Location constraint (first assignment allowed)
 # =========================================================
-
 def last_location_staff_before(cur, staff_id: int, dep_dt: datetime) -> str | None:
     """
     מיקום = שדה יעד של הטיסה האחרונה שהסתיימה לפני dep_dt.
-    אם אין => None (שיבוץ ראשון)
+    ✅ מתעלמים ממבוטלות כדי שה"מיקום האחרון" לא ייתקע על טיסה cancelled.
     """
     best_end = None
     best_loc = None
 
-    for f in staff_assigned_flights(cur, staff_id):
+    for f in staff_assigned_flights(cur, staff_id, include_cancelled=False):
         start, end = flight_time_range(f)
         if end < dep_dt:
             if best_end is None or end > best_end:
@@ -338,7 +345,6 @@ def last_location_staff_before(cur, staff_id: int, dep_dt: datetime) -> str | No
                 best_loc = f["dest_airport"]
 
     return best_loc
-
 
 def last_location_plane_before(cur, plane_id: int, dep_dt: datetime) -> str | None:
     best_end = None
@@ -348,13 +354,14 @@ def last_location_plane_before(cur, plane_id: int, dep_dt: datetime) -> str | No
         SELECT
             `Flight_Date`         AS flight_date,
             `Departure_Time`      AS departure_time,
-            `Plane_ID`          AS plane_id,
+            `Plane_ID`            AS plane_id,
             `Landing_Time`        AS landing_time,
             `Departure_Airport`   AS dep_airport,
             `Destination_Airport` AS dest_airport,
             `status`              AS status
-        FROM `Flights`
+        FROM `flights`
         WHERE `Plane_ID`=%s
+          AND LOWER(`status`) NOT LIKE '%cancel%'   -- ✅ מתעלמים ממבוטלות
     """, (int(plane_id),))
     flights = cur.fetchall() or []
 
@@ -394,7 +401,7 @@ def can_assign_staff(cur, flight_row, staff_id: int):
     """
     role = staff_role(cur, staff_id)
     if role is None:
-        return False, "ID is not a Pilot / Flight_Attendant"
+        return False, "ID is not a pilot / flight_attendant"
 
     if has_time_conflict_staff(cur, flight_row, staff_id):
         return False, "Time conflict"
@@ -455,18 +462,18 @@ def current_ticket_price_for_flight(cur, flight_date, departure_time, plane_id, 
     """
     a = fetch_flight_airports(cur, flight_date, departure_time, plane_id)
     if not a:
-        raise ValueError("Flight not found")
+        raise ValueError("flight not found")
 
     dur = fetch_route_duration_hours(cur, a["dep_airport"], a["dest_airport"])
     if dur is None:
-        raise ValueError("Missing route in Flight_Duration")
+        raise ValueError("Missing route in flight_duration")
 
     return base_per_hour * dur
 
 
 def set_booking_total_price(cur, booking_code: int, total_price: float):
     cur.execute("""
-        UPDATE `Bookings`
+        UPDATE `bookings`
         SET `total_price`=%s
         WHERE `booking_code`=%s
     """, (float(total_price), int(booking_code)))
@@ -511,7 +518,7 @@ def update_completed_flights(mydb):
 
     try:
         cur.execute("""
-            UPDATE `Flights`
+            UPDATE `flights`
             SET `status` = 'completed'
             WHERE `status` = 'active'
               AND TIMESTAMP(`Flight_Date`, `Departure_Time`) < NOW()
@@ -530,9 +537,128 @@ def update_completed_flights(mydb):
 
 def fetch_airports_from_flight_duration(cur):
     cur.execute("""
-        SELECT DISTINCT Departure_Airport AS code FROM Flight_Duration
+        SELECT DISTINCT Departure_Airport AS code FROM flight_duration
         UNION
-        SELECT DISTINCT Destination_Airport AS code FROM Flight_Duration
+        SELECT DISTINCT Destination_Airport AS code FROM flight_duration
         ORDER BY code
     """)
     return [r["code"] for r in (cur.fetchall() or [])]
+
+def _fetch_available_resources(cur, flight_date, departure_time, dep_airport, dest_airport):
+    """
+    מחזיר:
+      landing_time (מחושב),
+      available_planes: list[int],
+      available_pilots: list[dict{id,fname,lname}],
+      available_attendants: list[dict{id,fname,lname}]
+    """
+
+    landing_time = _compute_landing_time(
+        cur, dep_airport, dest_airport, flight_date, departure_time
+    )
+
+    # ---- PLANES ----
+    cur.execute("SELECT `ID` AS id FROM `plane`")
+    plane_ids = [r["id"] for r in (cur.fetchall() or [])]
+
+    available_planes = []
+    for pid in plane_ids:
+        flight_row = _build_flight_row_for_checks(
+            flight_date, departure_time, landing_time, dep_airport, dest_airport, pid
+        )
+
+        ok, _msg = can_use_plane(cur, flight_row, int(pid))
+        if not ok:
+            continue
+
+        # כלל: טיסה ארוכה => רק Large
+        try:
+            validate_long_flight_plane_size(cur, flight_row)
+        except Exception:
+            continue
+
+        available_planes.append(int(pid))
+
+    # ---- STAFF (pilot / attendant) ----
+    # לצוות לא באמת צריך plane_id "אמיתי" — הבדיקות שלך לצוות הן זמן+מיקום.
+    # נשתמש ב-1 כדי לבנות flight_row, זה לא אמור להשפיע על can_assign_staff.
+    staff_flight_row = _build_flight_row_for_checks(
+        flight_date, departure_time, landing_time, dep_airport, dest_airport, 1
+    )
+
+    # ---- PILOTS ----
+    cur.execute("SELECT `ID` AS id, `fname` AS fname, `lname` AS lname FROM `Pilot`")
+    pilots = cur.fetchall() or []
+
+    available_pilots = []
+    for p in pilots:
+        ok, _msg = can_assign_staff(cur, staff_flight_row, int(p["id"]))
+        if ok:
+            available_pilots.append({
+                "id": int(p["id"]),
+                "fname": p.get("fname"),
+                "lname": p.get("lname"),
+            })
+
+    # ---- ATTENDANTS ----
+    cur.execute("SELECT `ID` AS id, `fname` AS fname, `lname` AS lname FROM `flight_attendant`")
+    attendants = cur.fetchall() or []
+
+    available_attendants = []
+    for a in attendants:
+        ok, _msg = can_assign_staff(cur, staff_flight_row, int(a["id"]))
+        if ok:
+            available_attendants.append({
+                "id": int(a["id"]),
+                "fname": a.get("fname"),
+                "lname": a.get("lname"),
+            })
+
+    return landing_time, available_planes, available_pilots, available_attendants
+
+
+def _normalize_date(d):
+    if isinstance(d, date):
+        return d
+    return datetime.strptime(str(d)[:10], "%Y-%m-%d").date()
+
+def _normalize_time(t):
+    if isinstance(t, time):
+        return t
+    s = str(t).split(".")[0]
+    # יכול להגיע HH:MM
+    if len(s) == 5:
+        s += ":00"
+    return datetime.strptime(s, "%H:%M:%S").time()
+
+def _compute_landing_time(cur, dep_airport, dest_airport, flight_date, departure_time):
+    """
+    Landing_Time מחושב לפי Flight_Duration:
+    landing_dt = dep_dt + duration_hours
+    נשמור רק את ה-time לטבלת Flights.
+    """
+    dur = fetch_route_duration_hours(cur, dep_airport, dest_airport)
+    if dur is None:
+        raise ValueError("Missing route in flight_duration for this route.")
+
+    dep_dt = datetime.combine(flight_date, departure_time)
+    land_dt = dep_dt + timedelta(hours=float(dur))
+    return land_dt.time()
+
+def _build_flight_row_for_checks(flight_date, departure_time, landing_time, dep_airport, dest_airport, plane_id):
+    return {
+        "flight_date": flight_date,
+        "departure_time": departure_time,
+        "landing_time": landing_time,
+        "dep_airport": dep_airport,
+        "dest_airport": dest_airport,
+        "plane_id": int(plane_id),
+        "status": "active"
+    }
+
+def _flight_capacity_for_plane(classes_rows):
+    # classes_rows: list of dicts with Number_of_Rows/Number_of_Columns
+    cap = 0
+    for c in classes_rows:
+        cap += int(c["Number_of_Rows"]) * int(c["Number_of_Columns"])
+    return cap

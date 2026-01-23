@@ -7,48 +7,119 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 
-<body>
-  <div class="page-wrap">
-    <div class="home-card">
+<body class="home">
 
-      <img src="{{ url_for('static', filename='logo.png') }}"
-           alt="FLYTAU Logo"
-           class="logo"
-           onerror="this.style.display='none'">
-
-      <h1 class="title">Welcome to FLYTAU</h1>
-
-      {% if session.get("username") %}
-        <p class="subtitle">Welcome, <b>{{ session["username"] }}</b></p>
-      {% else %}
-        <p class="subtitle">Please login or sign up</p>
-      {% endif %}
-
-      <div class="btn-group">
-        <a class="btn primary" href="/login">Login</a>
-        <a class="btn accent" href="/signup">Sign Up</a>
-      </div>
-
-      <div class="divider"></div>
-
-      <div class="btn-group">
-        <a class="btn ghost" href="/flights">Flights</a>
-        <a class="btn ghost" href="/my_booking">Booking</a>
-      </div>
-
-      <div class="divider"></div>
-
-      <div class="btn-group">
-        <a class="btn ghost" href="/admin_login">Admin</a>
-        <a class="btn ghost" href="/admin_dashboard">Forms</a>
-      </div>
-
-      {% if session.get("username") %}
-        <div class="divider"></div>
-        <a class="btn danger" href="/logout">Logout</a>
-      {% endif %}
-
+  <header class="site-header split-header">
+    <div class="logo-area">
+      <a class="brand" href="/" aria-label="Home">
+        <img src="{{ url_for('static', filename='logo.png') }}"
+             alt="FLYTAU Logo"
+             onerror="this.style.display='none'">
+      </a>
     </div>
-  </div>
+
+    <div class="nav-bar">
+      <div class="nav-inner">
+
+        <nav class="nav-links">
+          <a href="/flights">Flights</a>
+          <a href="/my_booking">Manage Booking</a>
+          <a href="/admin_login">Admin</a>
+          <a href="/board">Board of Directors</a>
+        </nav>
+
+        <div class="nav-actions">
+          {% if session.get("username") %}
+            <a class="pill primary" href="/logout">Logout</a>
+          {% else %}
+            <a class="pill" href="/login">Login</a>
+          <a href="/signup" class="pill primary">
+  Join Now
+</a>
+
+
+          {% endif %}
+        </div>
+
+      </div>
+    </div>
+  </header>
+
+  <section class="hero" style="--hero-img: url('{{ url_for('static', filename='homepageimg.png-.png') }}');">
+    <div class="hero-inner single center-hero">
+      <div class="hero-left">
+        <h1 style="color: white;">Welcome to FLYTAU</h1>
+
+        <p class="hero-subtitle">
+          Book flights in seconds and manage your reservations easily.
+        </p>
+
+        <div class="hero-cta">
+          <a class="cta-btn primary" href="/flights">Book Flights</a>
+          <a class="cta-btn ghost" href="/my_booking">Manage Booking</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+  <section class="mini-gallery-section">
+    <h2 class="gallery-title">Vacation Inspiration Gallery</h2>
+
+    <div class="mini-gallery">
+      <div class="gallery-item">
+        <img src="{{ url_for('static', filename='destinations/rome.jpg') }}" alt="Rome">
+        <span>Rome</span>
+      </div>
+
+      <div class="gallery-item">
+        <img src="{{ url_for('static', filename='destinations/athens.jpg') }}" alt="Athens">
+        <span>Athens</span>
+      </div>
+
+      <div class="gallery-item">
+        <img src="{{ url_for('static', filename='destinations/newyork.jpg') }}" alt="New York">
+        <span>New York</span>
+      </div>
+
+      <div class="gallery-item">
+        <img src="{{ url_for('static', filename='destinations/dubai.jpg') }}" alt="Dubai">
+        <span>Dubai</span>
+      </div>
+
+      <div class="gallery-item">
+        <img src="{{ url_for('static', filename='destinations/telaviv.jpg') }}" alt="Tel Aviv">
+        <span>Tel Aviv</span>
+      </div>
+
+      <div class="gallery-item">
+        <img src="{{ url_for('static', filename='destinations/amsterdam.jpg') }}" alt="Amsterdam">
+        <span>Amsterdam</span>
+      </div>
+
+      <div class="gallery-item">
+        <img src="{{ url_for('static', filename='destinations/paris.jpg') }}" alt="Paris">
+        <span>Paris</span>
+      </div>
+
+      <div class="gallery-item">
+        <img src="{{ url_for('static', filename='destinations/frankfurt.jpg') }}" alt="Frankfurt">
+        <span>Frankfurt</span>
+      </div>
+
+      <div class="gallery-item">
+        <img src="{{ url_for('static', filename='destinations/larnaca.jpg') }}" alt="Larnaca">
+        <span>Larnaca</span>
+      </div>
+
+      <div class="gallery-item">
+        <img src="{{ url_for('static', filename='destinations/london.jpg') }}" alt="London">
+        <span>London</span>
+      </div>
+    </div>
+    </section>
+
+
+
 </body>
 </html>

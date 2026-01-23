@@ -4,9 +4,34 @@
    <head>
       <title>Login</title>
       <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+       <style>
+           .page{
+      width:100%;
+      max-width:none;
+      padding:40px 32px;
+      display:flex;
+      justify-content:center;
+    }
+
+    /* רוחב נוח – לא צר, לא מרוח */
+    .card{
+      width:100%;
+      max-width:720px;
+      background:#fff;
+      border-radius:22px;
+      padding:28px;
+      box-shadow:0 14px 36px rgba(14,29,45,0.12);
+      border:1px solid #E6EBF3;
+    }
+       </style>
+
    </head>
 
    <body>
+    {% include "_navbar.html" %}
+    <div class="page">
+    <div class="card">
       <div>
           <div>
           <h1> Login </h1>
@@ -22,6 +47,8 @@
             <a href="{{ url_for('signup') }}">New customer? Sign up now!</a>
           </div>
       </div>
+    </div>
+    </div>
    </body>
 
 </html>
