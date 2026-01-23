@@ -32,8 +32,8 @@ app.config["SECRET_KEY"] = "flytau-dev-secret"
 
 app.config.update(
     SESSION_TYPE="filesystem",
-    # SESSION_FILE_DIR="flask_session_data",   # if using local
-    SESSION_FILE_DIR="/home/segev/information_systems_project/flask_session_data",   # if using pythonanywhere
+    SESSION_FILE_DIR="flask_session_data",   # if using local
+    # SESSION_FILE_DIR="/home/segev/information_systems_project/flask_session_data",   # if using pythonanywhere
     SESSION_PERMANENT=True,
     PERMANENT_SESSION_LIFETIME=timedelta(minutes=10),
     SESSION_REFRESH_EACH_REQUEST=True,
@@ -44,17 +44,17 @@ Session(app)
 
 mydb = mysql.connector.connect(
 
-    # # #### if using local ####
-    # host="localhost",
-    # user="root",
-    # password="root",
-    # database="flytau",
+    # #### if using local ####
+    host="localhost",
+    user="root",
+    password="root",
+    database="flytau",
 
-    ### if using pythonanywhere ####
-    host= "segev.mysql.pythonanywhere-services.com",
-    user="segev",
-    password="Amit1111",
-    database="segev$flytau_DB",
+    # ### if using pythonanywhere ####
+    # host= "segev.mysql.pythonanywhere-services.com",
+    # user="segev",
+    # password="Amit1111",
+    # database="segev$flytau_DB",
 
     #### General ####
     autocommit=True
@@ -2152,7 +2152,8 @@ def generate_admin_stats_report(mydb, app_root_path):
     plt.title("Revenue Comparison: Business vs Economy")
     plt.legend()
     plt.tight_layout()
-    plt.savefig("static/reports/revenue_by_plane_group.png", dpi=150)
+    revenue_by_plane_group_group_path = os.path.join(out_dir, "revenue_by_plane_group.png")
+    plt.savefig(revenue_by_plane_group_group_path, dpi=150, bbox_inches="tight")
     plt.close()
     # ==========================================================
     # 3️⃣ Monthly averages table – last 3 months
@@ -2206,5 +2207,5 @@ def admin_statistics():
 @app.route('/board')
 def board_page():
     return render_template('board.html')
-# if __name__ == "__main__": # uncomment if using local, comment if using pythonanywhere.
-#     app.run(debug=True)
+if __name__ == "__main__": # uncomment if using local, comment if using pythonanywhere.
+    app.run(debug=True)

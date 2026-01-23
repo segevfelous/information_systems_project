@@ -1,0 +1,14 @@
+Flask==3.1.2
+Flask-Session==0.8.0
+mysql-connector-python==9.5.0
+numpy==1.26.4
+pandas==2.2.3
+matplotlib==3.8.4
+Werkzeug==3.1.5
+Jinja2==3.1.6
+itsdangerous==2.2.0
+click==8.3.1
+blinker==1.9.0
+cachelib==0.13.0
+MarkupSafe==3.0.3
+msgspec==0.20.0
