@@ -45,16 +45,16 @@ Session(app)
 mydb = mysql.connector.connect(
 
     # #### if using local ####
-    host="localhost",
-    user="root",
-    password="root",
-    database="flytau",
+    # host="localhost",
+    # user="root",
+    # password="root",
+    # database="flytau",
 
     # ### if using pythonanywhere ####
-    # host= "segev.mysql.pythonanywhere-services.com",
-    # user="segev",
-    # password="Amit1111",
-    # database="segev$flytau_DB",
+    host= "segev.mysql.pythonanywhere-services.com",
+    user="segev",
+    password="Amit1111",
+    database="segev$flytau_DB",
 
     #### General ####
     autocommit=True
@@ -2207,5 +2207,5 @@ def admin_statistics():
 @app.route('/board')
 def board_page():
     return render_template('board.html')
-if __name__ == "__main__": # uncomment if using local, comment if using pythonanywhere.
-    app.run(debug=True)
+# if __name__ == "__main__": # uncomment if using local, comment if using pythonanywhere.
+#     app.run(debug=True)
