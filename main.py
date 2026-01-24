@@ -107,7 +107,7 @@ def login():
 @app.route("/logout")
 def logout():
     session.clear()      # מוחק את כל הסשן (user / admin / role)
-    return render_template("homepage.html")
+    return render_template("Homepage.html")
 
 
 @app.route("/signup", methods=["GET", "POST"])
