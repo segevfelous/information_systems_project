@@ -17,3 +17,4 @@ venv/
 .DS_Store
 Thumbs.db
 flask_session_data/
+flask_session_data
