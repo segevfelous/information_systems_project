@@ -416,8 +416,9 @@ button:active{ transform: translateY(1px); }
 /* ---------- 7) Site-wide background (all pages EXCEPT home) ---------- */
 /* Requires: body class="home" only on homepage */
 body:not(.home){
-  background:
-    linear-gradient(rgba(246,248,252,0.92), rgba(246,248,252,0.92)),
-    url("backgroundimg.png") no-repeat center center fixed;
-  background-size: cover;
+background:  linear-gradient(rgba(246,248,252,0.45), rgba(246,248,252,0.45)),
+  url("/static/backgroundimg.png")
+  no-repeat center center fixed;
+   background-size:
+   cover;
 }
