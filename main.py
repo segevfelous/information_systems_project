@@ -32,8 +32,8 @@ app.config["SECRET_KEY"] = "flytau-dev-secret"
 
 app.config.update(
     SESSION_TYPE="filesystem",
-    SESSION_FILE_DIR="flask_session_data",   # if using local
-    # SESSION_FILE_DIR="/home/segev/information_systems_project/flask_session_data",   # if using pythonanywhere
+    # SESSION_FILE_DIR="flask_session_data",   # if using local
+    SESSION_FILE_DIR="/home/segev/information_systems_project/flask_session_data",   # if using pythonanywhere
     SESSION_PERMANENT=True,
     PERMANENT_SESSION_LIFETIME=timedelta(minutes=10),
     SESSION_REFRESH_EACH_REQUEST=True,

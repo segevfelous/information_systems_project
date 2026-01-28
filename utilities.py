@@ -31,7 +31,7 @@ def fetch_plane_size(cur, plane_id):
     """
     cur.execute("""
         SELECT `Size` AS size
-        FROM `Plane`
+        FROM `plane`
         WHERE `ID`=%s
         LIMIT 1
     """, (int(plane_id),))

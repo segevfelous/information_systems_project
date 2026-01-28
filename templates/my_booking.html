@@ -303,9 +303,11 @@
                     {% else %}
                       <!-- ✅ שינוי קריטי: לא מעבירים email לביטול, רק booking_code -->
                       <form method="POST" action="/booking/cancel">
-                        <input type="hidden" name="booking_code" value="{{ b.booking_code }}">
-                        <button class="btn btn-danger" type="submit">Cancel</button>
-                      </form>
+  <input type="hidden" name="booking_code" value="{{ b.booking_code }}">
+  <input type="hidden" name="email" value="{{ email }}">
+  <button class="btn btn-danger" type="submit">Cancel</button>
+</form>
+
                     {% endif %}
                   </td>
 
