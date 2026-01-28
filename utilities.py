@@ -199,7 +199,7 @@ def required_crew_by_plane_size(plane_size: str):
 # =========================================================
 
 def is_pilot(cur, staff_id: int) -> bool:
-    cur.execute("SELECT 1 FROM `Pilot` WHERE `ID`=%s LIMIT 1", (int(staff_id),))
+    cur.execute("SELECT 1 FROM `pilot` WHERE `ID`=%s LIMIT 1", (int(staff_id),))
     return cur.fetchone() is not None
 
 
@@ -587,7 +587,7 @@ def _fetch_available_resources(cur, flight_date, departure_time, dep_airport, de
     )
 
     # ---- PILOTS ----
-    cur.execute("SELECT `ID` AS id, `fname` AS fname, `lname` AS lname FROM `Pilot`")
+    cur.execute("SELECT `ID` AS id, `fname` AS fname, `lname` AS lname FROM `pilot`")
     pilots = cur.fetchall() or []
 
     available_pilots = []
